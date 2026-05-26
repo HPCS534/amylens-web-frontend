@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { api, login as apiLogin } from '../../api/client'
+import { getDevPassword } from './passwordResetState'
 
 const AuthContext = createContext(null)
 
@@ -43,15 +44,24 @@ export function AuthProvider({ children }) {
   async function login(username, password) {
     setLoading(true)
     try {
+      if (import.meta.env.DEV && username === 'admin' && password === getDevPassword()) {
+        setIsAuthenticated(true)
+        return
+      }
+
       await apiLogin(username, password)
       // verify by calling a protected endpoint
       await api.getAllDevices()
       setIsAuthenticated(true)
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.warn('AmyLens backend login is unavailable in dev; enabling demo mode.', error)
+      if (import.meta.env.DEV && username === 'admin' && password === getDevPassword()) {
         setIsAuthenticated(true)
         return
+      }
+
+      if (import.meta.env.DEV) {
+        console.warn('AmyLens backend login is unavailable in dev; enabling demo mode.', error)
+        throw error
       }
       throw error
     } finally {

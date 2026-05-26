@@ -49,8 +49,8 @@ export default function DashboardShell({ children }) {
           </div>
 
           <div className="shell-topbar-right">
-            <button className="icon-button" aria-label="Notifications">◌</button>
-            <button className="icon-button" aria-label="Recent activity">↺</button>
+            {/* <button className="icon-button" aria-label="Notifications">◌</button>
+            <button className="icon-button" aria-label="Recent activity">↺</button> */}
             <div className="profile-chip">
               <div className="avatar">AS</div>
               <div>

@@ -437,7 +437,7 @@
   width: 100%;
   border: 1px solid #cad4e5;
   border-radius: 8px;
-  padding: 0.78rem 0.85rem;
+  padding: 0.78rem 0.000001rem;
   font: inherit;
   background: white;
   color: #15202b;

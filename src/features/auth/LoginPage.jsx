@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthProvider'
+import { hasCompletedPasswordReset } from './passwordResetState'
 import './LoginPage.css'
 
 function LoginPage() {
@@ -13,7 +14,11 @@ function LoginPage() {
     e.preventDefault()
     try {
       await login(username, password)
-      navigate('/app/devices')
+      if (!hasCompletedPasswordReset()) {
+        navigate('/reset-password', { replace: true })
+      } else {
+        navigate('/app/devices', { replace: true })
+      }
     } catch (err) {
       alert('Login failed: ' + (err.message || err))
     }
