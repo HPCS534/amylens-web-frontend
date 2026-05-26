@@ -1,10 +1,10 @@
 import './WireframesGallery.css'
 
-// Import all wireframe images generated from the SDD
-const modules = import.meta.globEager('/src/assets/wireframes/*.{png,jpg,jpeg}')
+// Import all wireframe images generated from the SDD (use eager glob for Vite compatibility)
+const modules = import.meta.glob('/src/assets/wireframes/*.{png,jpg,jpeg}', { eager: true })
 const images = Object.keys(modules)
   .sort()
-  .map((p) => ({ path: p, src: modules[p].default }))
+  .map((p) => ({ path: p, src: modules[p].default || modules[p] }))
 
 export default function WireframesGallery() {
   return (

@@ -1,0 +1,20 @@
+/* Centered login card matching SDD wireframe T4.1 */
+:root{
+  --bg:#f1f5f9;
+  --card:#ffffff;
+  --primary:#0f62fe;
+  --muted:#64748b;
+}
+body { background: var(--bg); }
+.auth-panel { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:3rem 1rem; min-height:60vh }
+.auth-card { width: 380px; background:var(--card); border-radius:8px; box-shadow:0 6px 18px rgba(16,24,40,0.06); padding:1.5rem }
+.auth-icon { width:56px; height:56px; background:var(--primary); color:white; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; margin:0 auto 0.75rem }
+.auth-title { text-align:center; font-weight:700; margin:0 0 0.25rem }
+.auth-sub { text-align:center; color:var(--muted); font-size:0.95rem; margin-bottom:1rem }
+.login-form label { display:block; font-size:0.75rem; color:var(--muted); margin-bottom:0.25rem }
+.login-form input { width:100%; padding:0.6rem 0.75rem; border-radius:6px; border:1px solid #e6eef8; box-sizing:border-box; margin-bottom:0.75rem }
+.form-actions { margin-top:0.5rem }
+.btn-primary { background:var(--primary); color:white; width:100%; padding:0.75rem; border-radius:6px; border:none }
+.hint { margin-top:0.75rem; font-size:0.85rem; color:var(--muted) }
+.footer-links { display:flex; gap:1rem; justify-content:center; margin-top:1rem; color:var(--muted); font-size:0.85rem }
+.forgot { float:right; font-size:0.85rem; color:var(--primary); text-decoration:none }
