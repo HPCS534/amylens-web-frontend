@@ -2,58 +2,107 @@ function formatMetricConfidence(metricConfidence) {
   return `${(metricConfidence * 100).toFixed(1)}%`
 }
 
-function ReviewModal({ analysisSession, reasonComment, onReasonCommentChange, onClose, onSubmit }) {
-  const hasReason = reasonComment.trim().length > 0
+function ReviewModal({ analysisSession, reasonComment, onReasonCommentChange, onClose, onApprove, onReject, noteError }) {
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal" role="dialog" aria-modal="true" aria-label="Outlier Review Modal">
-        <div className="modal-header">
-          <div>
-            <div className="card-title" style={{ marginBottom: '0.25rem' }}>Review Session</div>
-            <h3 style={{ margin: 0 }}>{analysisSession.sessionId}</h3>
-            <div className="subtle">Approve or reject this flagged record after inspection.</div>
+    <div className="modal-backdrop review-backdrop">
+      <div className="modal review-modal" role="dialog" aria-modal="true" aria-label="Review Flagged Session">
+        <div className="review-modal-header">
+          <div className="review-title-row">
+            <span className="review-warning-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                <path d="M12 2 1 22h22L12 2zm0 6.2 4.4 8.4H7.6L12 8.2zm-1 3.3v3.2h2v-3.2h-2zm0 4.2v2h2v-2h-2z" fill="currentColor" />
+              </svg>
+            </span>
+            <h3>Review Flagged Session</h3>
           </div>
-          <button className="icon-button" onClick={onClose} aria-label="Close">✕</button>
+          <button className="icon-button review-close-button" type="button" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
         </div>
-        <div className="modal-body">
-          <div className="mini-summary" style={{ marginBottom: '1rem' }}>
-            <strong>{formatMetricConfidence(analysisSession.metricConfidence ?? 0)}</strong>
-            <div className="subtle">AI confidence</div>
+
+        <div className="review-modal-warning">
+          Rejecting this session will permanently invalidate the session data.
+        </div>
+
+        <div className="review-modal-body">
+          <div className="review-detail-card">
+            <div>
+              <div className="review-label">SESSION ID</div>
+              <div className="review-value">{analysisSession.sessionId}</div>
+            </div>
+            <div>
+              <div className="review-label">FLAG REASON</div>
+              <div className="review-value review-reason">{analysisSession.flagReason ?? 'Manual Flag: Validation Required'}</div>
+            </div>
           </div>
-          <div className="field-group">
-            <label htmlFor="reason-comment">Reviewer Note</label>
+
+          <div className="field-group review-note-group">
+            <label htmlFor="reason-comment">Review Notes <span className="review-required">*</span></label>
             <textarea
               id="reason-comment"
               value={reasonComment}
               onChange={(event) => onReasonCommentChange(event.target.value)}
-              rows={4}
-              placeholder="Add a note if you reject the session..."
+              rows={6}
+              placeholder="Provide justification..."
             />
           </div>
-          <div className="help-note">Reject requires a reviewer note. Approve can proceed with an empty note.</div>
+
+          {noteError && <div className="review-error">{noteError}</div>}
+
+          <div className="review-assistive">Your justification will be logged for auditing purposes.</div>
         </div>
-        <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
-          <button className="ghost-button" type="button" onClick={onClose}>
+
+        <div className="review-modal-actions">
+          <button className="outline-button review-approve-button" type="button" onClick={() => onApprove(analysisSession.sessionId)}>
+            <span className="review-button-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                <path d="M12 2a10 10 0 1 0 10 10A10.01 10.01 0 0 0 12 2zm4.7 7.9-5.3 5.3-2.8-2.8 1.4-1.4 1.4 1.4 3.9-3.9z" fill="currentColor" />
+              </svg>
+            </span>
+            Approve (Clear Flag)
+          </button>
+          <button className="ghost-button review-cancel-button" type="button" onClick={onClose}>
             Cancel
           </button>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button className="outline-button" type="button" onClick={() => onSubmit(analysisSession.sessionId, reasonComment)}>
-              Approve
-            </button>
-            <button
-              className="primary-button"
-              type="button"
-              onClick={() => onSubmit(analysisSession.sessionId, reasonComment)}
-              disabled={!hasReason}
-            >
-              Submit Review
-            </button>
-          </div>
+          <button className="primary-button review-reject-button" type="button" onClick={() => onReject(analysisSession.sessionId, reasonComment)}>
+            <span className="review-button-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                <path d="M6 3h12l3 4v14H3V3h3zm2 4h8V5H8v2zm1 4 3 3 3-3 1.4 1.4-3 3 3 3L15 19l-3-3-3 3-1.4-1.4 3-3-3-3L9 11z" fill="currentColor" />
+              </svg>
+            </span>
+            Reject Session
+          </button>
         </div>
       </div>
     </div>
   )
 }
 
+function ReviewSuccessModal({ action, onDismissAndRefresh }) {
+  const isApprove = action === 'approve'
+
+  return (
+    <div className="modal-backdrop review-backdrop">
+      <div className="modal review-success-modal" role="dialog" aria-modal="true" aria-label="Review Success">
+        <div className="review-success-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+            <path d="M12 2a10 10 0 1 0 10 10A10.01 10.01 0 0 0 12 2zm-1 13.2-3.1-3.1 1.4-1.4 1.7 1.7 4.3-4.3 1.4 1.4z" fill="currentColor" />
+          </svg>
+        </div>
+        <div className="review-success-title">{isApprove ? 'Session Approved Successfully' : 'Session Rejected Successfully'}</div>
+        <div className="review-success-copy">
+          {isApprove
+            ? 'The session flag has been resolved and the data has been verified for institutional reporting.'
+            : 'The session flag has been resolved and the data has been invalidated for security purposes.'}
+        </div>
+        <button className="primary-button review-success-button" type="button" onClick={onDismissAndRefresh}>
+          Dismiss and Refresh
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export { ReviewSuccessModal }
 export default ReviewModal
