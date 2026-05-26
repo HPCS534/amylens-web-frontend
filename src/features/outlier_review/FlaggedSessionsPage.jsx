@@ -1,12 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api/client'
-import ReviewModal from './ReviewModal'
+import ReviewModal, { ReviewSuccessModal } from './ReviewModal'
 
 const defaultFlaggedSessions = [
   { sessionId: 'SESS-892', metricConfidence: 0.984, status: 'needs_review', flagReason: 'Anomalous Color Profile Detection', technician: 'John Doe' },
   { sessionId: 'SESS-741', metricConfidence: 0.892, status: 'needs_review', flagReason: 'Unexpected Packet Latency Spikes', technician: 'Anna Smith' },
   { sessionId: 'SESS-103', metricConfidence: 0.621, status: 'needs_review', flagReason: 'Manual Flag: Validation Required', technician: 'Mike Kelvin' },
 ]
+
+function normalizeSessions(payload, fallback = defaultFlaggedSessions) {
+  let sessions = null
+  if (Array.isArray(payload)) sessions = payload
+  else if (Array.isArray(payload?.content)) sessions = payload.content
+  else if (Array.isArray(payload?.sessions)) sessions = payload.sessions
+  else return fallback
+  
+  // Fallback to hardcoded data if API returns empty
+  return sessions.length > 0 ? sessions : fallback
+}
 
 function formatMetricConfidence(metricConfidence) {
   return `${(metricConfidence * 100).toFixed(1)}%`
@@ -16,6 +27,8 @@ function FlaggedSessionsPage({ sessions = defaultFlaggedSessions, onSubmitReview
   const [records, setRecords] = useState(sessions)
   const [selectedSession, setSelectedSession] = useState(null)
   const [reasonComment, setReasonComment] = useState('')
+  const [reviewOutcome, setReviewOutcome] = useState(null)
+  const [noteError, setNoteError] = useState('')
 
   useEffect(() => {
     let active = true
@@ -23,8 +36,7 @@ function FlaggedSessionsPage({ sessions = defaultFlaggedSessions, onSubmitReview
       .getSessions({ status: 'needs_review' })
       .then((payload) => {
         if (!active) return
-        const normalized = Array.isArray(payload) ? payload : payload?.content ?? payload?.sessions ?? sessions
-        setRecords(normalized)
+        setRecords(normalizeSessions(payload, sessions))
       })
       .catch(() => {
         if (active) setRecords(sessions)
@@ -37,16 +49,50 @@ function FlaggedSessionsPage({ sessions = defaultFlaggedSessions, onSubmitReview
   const openReview = (analysisSession) => {
     setSelectedSession(analysisSession)
     setReasonComment('')
+    setNoteError('')
   }
 
   const closeReview = () => {
     setSelectedSession(null)
     setReasonComment('')
+    setNoteError('')
   }
 
-  const submitReview = (sessionId, reason) => {
-    onSubmitReview({ sessionId, reason })
+  const refreshSessions = async () => {
+    try {
+      const payload = await api.getSessions({ status: 'needs_review' })
+      setRecords(normalizeSessions(payload, sessions))
+    } catch (error) {
+      if (!import.meta.env.DEV) throw error
+    }
+  }
+
+  const reviewSession = async (sessionId, action, reason = '') => {
+    if (action === 'reject' && !reason.trim()) {
+      setNoteError('Review notes are required before rejecting a session.')
+      return
+    }
+
+    setNoteError('')
+
+    try {
+      await api.reviewSession(sessionId, {
+        action,
+        reviewerNote: reason.trim() || undefined,
+      })
+    } catch (error) {
+      if (!import.meta.env.DEV) throw error
+    }
+
+    onSubmitReview({ sessionId, action, reason })
+    setRecords((current) => current.filter((record) => record.sessionId !== sessionId))
+    setReviewOutcome({ sessionId, action })
     closeReview()
+  }
+
+  const dismissAndRefresh = async () => {
+    setReviewOutcome(null)
+    await refreshSessions()
   }
 
   const summary = useMemo(() => ({ total: records.length, urgent: records.filter((record) => record.metricConfidence >= 0.9).length }), [records])
@@ -133,8 +179,14 @@ function FlaggedSessionsPage({ sessions = defaultFlaggedSessions, onSubmitReview
           reasonComment={reasonComment}
           onReasonCommentChange={setReasonComment}
           onClose={closeReview}
-          onSubmit={submitReview}
+          noteError={noteError}
+          onApprove={(sessionId) => reviewSession(sessionId, 'approve')}
+          onReject={(sessionId, reason) => reviewSession(sessionId, 'reject', reason)}
         />
+      )}
+
+      {reviewOutcome && (
+        <ReviewSuccessModal action={reviewOutcome.action} onDismissAndRefresh={dismissAndRefresh} />
       )}
     </div>
   )

@@ -34,10 +34,14 @@ const defaultDeviceRegistrations = [
 ]
 
 function normalizeDevices(payload) {
-  if (Array.isArray(payload)) return payload
-  if (Array.isArray(payload?.devices)) return payload.devices
-  if (Array.isArray(payload?.content)) return payload.content
-  return defaultDeviceRegistrations
+  let devices = null
+  if (Array.isArray(payload)) devices = payload
+  else if (Array.isArray(payload?.devices)) devices = payload.devices
+  else if (Array.isArray(payload?.content)) devices = payload.content
+  else return defaultDeviceRegistrations
+  
+  // Fallback to hardcoded data if API returns empty
+  return devices.length > 0 ? devices : defaultDeviceRegistrations
 }
 
 function statusClass(status) {
@@ -97,7 +101,7 @@ function DeviceManagementPage({ deviceRegistrations = defaultDeviceRegistrations
   return (
     <div className="module-grid" aria-label="Device Management Workspace">
       <section className="hero-grid">
-        <article className="card qr-card">
+        <article className="card qr-card hero-qr-card">
           <div className="card-title">Provisioning</div>
           <div className="pill-row">
             <span className="pill-info pill">Active Node</span>
@@ -116,34 +120,38 @@ function DeviceManagementPage({ deviceRegistrations = defaultDeviceRegistrations
             <button className="ghost-button" type="button">⧉</button>
           </div>
         </article>
+        <section className="hero-stack">
+          <div className="hero-stack-top">
+            <article className="card">
+              <div className="card-title">Active Fleet</div>
+              <div className="mini-summary">
+                <strong>{stats.activeFleet}</strong>
+                <span>/ {stats.total}</span>
+              </div>
+              <div className="mini-progress" aria-hidden="true">
+                <span style={{ width: `${Math.min(100, Math.round((stats.activeFleet / Math.max(stats.total, 1)) * 100))}%` }} />
+              </div>
+              <div className="stat-caption">Capacity utilized across regions</div>
+            </article>
 
-        <article className="card">
-          <div className="card-title">Active Fleet</div>
-          <div className="mini-summary">
-            <strong>{stats.activeFleet}</strong>
-            <span>/ {stats.total}</span>
+            <article className="card">
+              <div className="card-title" style={{ color: '#cc1f1f' }}>Pending Approval</div>
+              <div className="stat-number">{String(stats.pendingApproval).padStart(2, '0')}</div>
+              <div className="stat-caption">Requires immediate review</div>
+              <div style={{ textAlign: 'right', marginTop: 'auto' }}>
+                <button className="ghost-button" type="button">View All</button>
+              </div>
+            </article>
           </div>
-          <div className="mini-progress" aria-hidden="true">
-            <span style={{ width: `${Math.min(100, Math.round((stats.activeFleet / Math.max(stats.total, 1)) * 100))}%` }} />
-          </div>
-          <div className="stat-caption">Capacity utilized across regions</div>
-        </article>
-
-        <article className="card">
-          <div className="card-title" style={{ color: '#cc1f1f' }}>Pending Approval</div>
-          <div className="stat-number">{String(stats.pendingApproval).padStart(2, '0')}</div>
-          <div className="stat-caption">Requires immediate review</div>
-          <div style={{ textAlign: 'right', marginTop: 'auto' }}>
-            <button className="ghost-button" type="button">View All</button>
-          </div>
-        </article>
+          <article className="card blue-panel hero-blue-panel">
+            <div className="card-title">System Health</div>
+            <h2 style={{ margin: '0.3rem 0', fontSize: '2rem' }}>All protocols operational</h2>
+            <div className="stat-caption">Last security handshake: 2 mins ago</div>
+          </article>
+        </section>
       </section>
 
-      <article className="card blue-panel">
-        <div className="card-title">System Health</div>
-        <h2 style={{ margin: '0.3rem 0', fontSize: '2rem' }}>All protocols operational</h2>
-        <div className="stat-caption">Last security handshake: 2 mins ago</div>
-      </article>
+      
 
       <section className="section-card">
         <div className="section-head">
@@ -152,8 +160,8 @@ function DeviceManagementPage({ deviceRegistrations = defaultDeviceRegistrations
             <div className="section-subtitle">Authorization queue for new hardware nodes.</div>
           </div>
           <div className="pill-row">
-            <button className="outline-button" type="button">Filter</button>
-            <button className="outline-button" type="button">Export CSV</button>
+            <button className="ghost-button" type="button">Filter</button>
+            <button className="ghost-button" type="button">Export CSV</button>
           </div>
         </div>
 
@@ -183,10 +191,10 @@ function DeviceManagementPage({ deviceRegistrations = defaultDeviceRegistrations
                       <button className="ghost-button sr-only" aria-label={`Manage ${registration.hardwareIdentity ?? registration.ssaid ?? registration.id}`} type="button" onClick={() => setSelectedRegistration(registration)}>
                         Manage
                       </button>
-                      <button className="primary-button" type="button" onClick={() => updateDevice(registration, 'approve')} aria-label={`Approve ${registration.ssaid ?? registration.id}`}>
+                      <button className="outline-button" type="button" onClick={() => updateDevice(registration, 'approve')} aria-label={`Approve ${registration.ssaid ?? registration.id}`}>
                         ✓
                       </button>
-                      <button className="outline-button" type="button" onClick={() => updateDevice(registration, 'deny')} aria-label={`Deny ${registration.ssaid ?? registration.id}`}>
+                      <button className="primary-button" type="button" onClick={() => updateDevice(registration, 'deny')} aria-label={`Deny ${registration.ssaid ?? registration.id}`}>
                         ✕
                       </button>
                     </div>
