@@ -15,6 +15,29 @@
   margin-bottom: 1rem;
 }
 
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.actions { display: flex; gap: 0.5rem }
+
+.btn { padding: 0.45rem 0.75rem; border-radius: 6px; border: 1px solid transparent; cursor: pointer }
+.btn-primary { background: #0f62fe; color: white }
+.btn-ghost { background: transparent; border-color: #d4d4d8 }
+
+.badge { padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.8rem }
+.badge-healthy { background: #d1fae5; color: #065f46 }
+.badge-warning { background: #fef3c7; color: #92400e }
+.badge-flagged { background: #ffe4e6; color: #9f1239 }
+
 .cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
@@ -25,7 +48,13 @@
   border: 1px solid #d4d4d8;
   border-radius: 6px;
   padding: 0.75rem;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  box-shadow: 0 1px 2px rgba(2,6,23,0.04);
 }
+
+.device-card h3 { margin: 0 0 0.25rem 0 }
+.device-card p { margin: 0.15rem 0 }
+.device-card .device-actions { margin-top: 0.5rem; display:flex; gap:0.5rem }
 
 .table {
   width: 100%;
@@ -38,6 +67,16 @@
   padding: 0.5rem;
   text-align: left;
 }
+
+.table .small { font-size: 0.9rem; color: #374151 }
+
+.wireframes-gallery .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap:0.5rem }
+.wireframe-item img { width:100%; height: auto; display:block; border-radius:4px }
+
+.modal { background: #ffffff; color: #18181b; border-radius: 8px; padding: 1rem; max-width: 480px; width: calc(100% - 2rem); }
+.modal .modal-header { display:flex; justify-content:space-between; align-items:center }
+.modal .modal-body { margin-top:0.5rem }
+.modal .modal-actions { margin-top: 0.75rem; display: flex; gap: 0.5rem; justify-content: flex-end }
 
 .modal-backdrop {
   position: fixed;

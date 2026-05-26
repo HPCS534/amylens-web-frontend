@@ -1,0 +1,3176 @@
+=== PAGE 001 ===
+CEBU INSTITUTE OF TECHNOLOGY 
+UNIVERSITY 
+ 
+ 
+COLLEGE OF COMPUTER STUDIES 
+ 
+ 
+ 
+ 
+ 
+ 
+Software Design Description 
+for 
+AmyLens 
+
+
+=== PAGE 002 ===
+ 
+ 
+ 
+
+
+=== PAGE 003 ===
+ 
+ 
+ 
+ 
+ 
+2 
+
+
+=== PAGE 004 ===
+ 
+This Software Design Description (SDD) was prepared by Group M of CS342 - F1 as a partial fulfillment of the 
+course requirements for Software Engineering 1 at Cebu Institute of Technology – University. It serves as the 
+primary design reference for AmyLens, an on-device rice grain image validation and amylose classification 
+system designed to operate entirely within a local area network. 
+This document translates the previously approved AmyLens Software Requirements Specification (SRS) into a 
+detailed component-level design blueprint covering all four modules of the system: the Android mobile application 
+(Modules 1 and 2), the Spring Boot backend server (Module 3), and the React web dashboard (Module 4). Each 
+module is designed and documented by its assigned team member. 
+The design decisions reflected in this document represent the team's agreed-upon architecture as of the time of 
+submission and are considered final. This document is intended for review by the course instructor and for internal 
+reference by all members of Group M throughout the development phase. 
+ 
+
+
+=== PAGE 005 ===
+ 
+ 
+1. Introduction​
+1 
+Purpose​
+1 
+Scope​
+1 
+Definitions and Acronyms​
+1 
+References​
+4 
+2. Architectural Design​
+5 
+3. Detailed Design​
+6 
+Module 1​
+6 
+1.1 Pre-Transaction Setup (One-Time)​
+6 
+1.2 Image Acquisition​
+9 
+1.3 Validation​
+11 
+1.4 Data Handoff​
+14 
+Module 2​
+16 
+2.1 Metadata Selection​
+16 
+2.2 On-Device Amylose Classification​
+18 
+2.3 Result Display​
+20 
+2.4 Session Submission to Server​
+21 
+2.5 Offline Queue & Retry (Exponential Backoff)​
+23 
+2.6 Settings Screen​
+25 
+Module 3                                                                                                                                  a​
+27 
+3.1 Session Ingestion​
+27 
+3.2 Anomaly Detection Processing​
+30 
+3.3 Device Registration, Authorized  & User List​
+32 
+● 3.3b Password Reset​
+36 
+3.4 Dashboard Data Request​
+37 
+3.5 Session Review Action​
+39 
+3.6 Data Export (14-column GQ-RIS Schema)​
+41 
+3.7 Reference Data Mirror Management​
+43 
+Module 4​
+46 
+Pre-Transaction Setup (One-Time)​
+46 
+4.1 Administrative Authentication​
+47 
+4.2 Device Registration & Management​
+50 
+4.3 Flagged Session Review​
+53 
+4.4 Analytics Visualization​
+57 
+4.5 Standardized Data Export​
+60 
+​
+ 
+
+
+=== PAGE 006 ===
+ 
+1.​ Introduction​
+ 
+ 
+Purpose 
+ 
+The purpose of this document is to translate the AmyLens Software Requirements Specification (SRS) into a 
+complete and detailed design blueprint for the entire system – an on‑device rice grain image validation, grain 
+extraction, amylose classification, and local server‑based anomaly detection system that operates entirely 
+within a local area network (LAN). It defines the architectural structure, component interactions, and detailed 
+transaction‑level design for all four modules (Android mobile app, Spring Boot backend, and React web 
+dashboard). This document serves as the definitive reference for developers, the team lead, and stakeholders 
+to ensure alignment with all functional requirements, non‑functional performance targets, and interface 
+contracts. The externally observable behaviour is fully specified: a researcher captures a rice grain image on 
+an Android tablet, selects their name and session metadata, and within 5 minutes receives an amylose class 
+(Waxy/Low/Intermediate/High) along with a confidence score, while the team lead reviews flagged sessions 
+on a web dashboard that never sends data outside the LAN. 
+ 
+ 
+Scope 
+ 
+This document covers the complete design of the AmyLens system, which includes: 
+ 
+●​
+An Android mobile application (Modules 1 and 2) – designed for on‑device image validation, grain 
+segmentation, amylose classification, metadata selection, offline queuing, and session submission to the 
+local server. 
+●​
+A local Spring Boot backend server (Module 3) – designed to handle device registration, session ingestion, 
+automated anomaly detection (using mirrored GQ‑RIS historical data), dashboard data serving, session 
+review actions, data export (CSV, JSON, PDF), and reference data import. 
+●​
+A React web dashboard (Module 4) – designed for team lead authentication, device management, flagged 
+session review, analytics visualisation, and standardised data export. 
+●​
+All communication – designed to occur exclusively over the institution’s WiFi LAN using HTTPS (TLS), with 
+no internet egress. The physical deployment is assumed to be contained within a single branch station or 
+research facility. 
+ 
+The SDD explicitly exclude: 
+ 
+●​
+Any cloud‑based processing, external API calls, or communication beyond the LAN. 
+●​
+Integration with laboratory wet‑chemistry equipment or external grain analysers. 
+●​
+Real‑time video processing or batch processing of multiple images simultaneously. 
+●​
+User authentication beyond device‑based approval (SSAID) and a single hardcoded admin dashboard 
+login (bcrypt‑hashed). 
+●​
+Deployment procedures, hardware provisioning, or user training. 
+●​
+Any changes to the underlying classifier model – the SDD treats the amylose classifier as a fixed black‑box 
+component. 
+ 
+ 
+Definitions and Acronyms 
+ 
+Module 1 
+●​
+CameraX: Android Jetpack library used for camera image capture. 
+●​
+SAF: Storage Access Framework; Android API used to access images from the device file picker. 
+●​
+SSAID: Android Settings.Secure.ANDROID_ID; a persistent unique identifier tied to the device and app 
+signing key, used to identify the device to the server. 
+          1 
+
+
+=== PAGE 007 ===
+ 
+●​
+LAN: Local Area Network; the WiFi network over which all AmyLens communication occurs. No internet 
+connectivity is used or permitted. 
+●​
+CIELAB: A perceptually uniform color space (L*a*b*) used to represent grain image data after conversion 
+from RGB. 
+●​
+JPEG: Joint Photographic Experts Group; the image format accepted as input by this module. 
+●​
+DTO: Data Transfer Object — a structured container used to carry data between processes without 
+business logic; passed in-memory from Module 1 to Module 2 containing the acceptance flag, rejection 
+reason, and CIELAB grain data. 
+●​
+OpenCV: Open Source Computer Vision Library; used for brightness analysis, sharpness computation, 
+grain segmentation, and color space conversion. 
+●​
+TOO_DARK: Rejection reason code returned when image brightness falls below the minimum threshold. 
+●​
+TOO_BRIGHT: Rejection reason code returned when image brightness exceeds the maximum threshold. 
+●​
+BLURRY: Rejection reason code returned when image sharpness (Laplacian variance) falls below the 
+minimum threshold. 
+●​
+NO_GRAINS: Rejection reason code returned when no rice grains are detected occupying a significant 
+portion of the image. 
+●​
+QR Code: Quick Response code — a 2D matrix barcode encoding the server base URL, generated 
+client-side by the dashboard during device setup (Tx 4.2). 
+●​
+HTTPS: Hypertext Transfer Protocol Secure — HTTP over TLS; required for all Module 3 communications 
+(also used by Module 1 for API calls). 
+ 
+Module 2 
+●​
+SSAID: Android Settings.Secure.ANDROID_ID; a persistent unique identifier tied to the device and app 
+signing key, used to identify the device to the server. 
+●​
+CIELAB: A perceptually uniform color space (L*a*b*) used to represent grain image data after conversion 
+from RGB. 
+●​
+DTO: Data Transfer Object — a structured container used to carry data between processes without 
+business logic; passed in-memory from Module 1 to Module 2 containing the acceptance flag, rejection 
+reason, and CIELAB grain data. 
+●​
+Exponential Backoff: Retry strategy used in Tx 2.5 where the wait interval doubles after each failed 
+submission attempt until the session is successfully uploaded. 
+●​
+SQLite: Lightweight, serverless, file-based relational database engine used on the Android tablet for the 
+offline queue and the varieties cache. 
+●​
+varieties_cache: Local SQLite table storing the last successfully fetched list of rice varieties. Used as a 
+fallback when the device is offline during Tx 2.1 metadata selection. 
+●​
+SessionDraft: In-memory object holding researcher-selected metadata fields before classification and 
+submission. Not persisted to any database. 
+●​
+Amylose Ordinal: Numeric mapping of amylose class for statistical comparison: Waxy=1, Low=2, 
+Intermediate=3, High=4. 
+●​
+WAXY: Amylose class label returned by the classifier indicating negligible amylose content. Ordinal value: 
+1. 
+●​
+LOW: Amylose class label returned by the classifier indicating low amylose content. Ordinal value: 2. 
+●​
+INTERMEDIATE: Amylose class label returned by the classifier indicating intermediate amylose content. 
+Ordinal value: 3. 
+●​
+HIGH: Amylose class label returned by the classifier indicating high amylose content. Ordinal value: 4. 
+●​
+LAN: Local Area Network; the WiFi network over which all AmyLens communication occurs. No internet 
+connectivity is used or permitted. 
+●​
+HTTPS: Hypertext Transfer Protocol Secure — HTTP over TLS; required for all Module 3 communications 
+(used by Module 2 for session submission). 
+ 
+Module 3 
+●​
+GQ-RIS: Grain Quality - Rice Information System — historical rice quality database mirrored locally. 
+●​
+Amylose Ordinal: Numeric mapping of amylose class for statistical comparison: Waxy=1, Low=2, 
+          2 
+
+
+=== PAGE 008 ===
+ 
+Intermediate=3, High=4. 
+●​
+mu +/- 2 sigma: Statistical threshold — result flagged if it falls more than 2 standard deviations from the 
+historical mean. 
+●​
+needs_review: Session verdict indicating the record requires manual team lead inspection. 
+●​
+verified: Session verdict indicating the record passed automated anomaly detection. 
+●​
+verdict_reason: Sub-reason for needs_review: one of deviation, insufficient_data, or low_confidence. 
+●​
+Pending Session: A session record received and stored but not yet processed by the anomaly detection 
+engine. 
+●​
+bcrypt: Password hashing algorithm used to store team lead credentials (cost factor 10). 
+●​
+JPA: Java Persistence API — specification for ORM in Java; implemented via Spring Data JPA. 
+●​
+ORM: Object-Relational Mapping — technique for mapping Java objects to relational database tables. 
+●​
+PostgreSQL: Open-source relational database system used as the canonical server-side data store. 
+●​
+Spring Boot: Java-based framework for building production-ready server applications with minimal 
+configuration. 
+●​
+Spring Data JPA: Spring module providing repository abstractions over JPA for database access. 
+●​
+Spring Security: Spring module providing authentication, authorization, and RBAC capabilities. 
+●​
+REST: Representational State Transfer — architectural style for stateless HTTP-based communication. 
+●​
+HTTPS: Hypertext Transfer Protocol Secure — HTTP over TLS; required for all Module 3 communications. 
+●​
+TLS: Transport Layer Security — cryptographic protocol securing all server connections. 
+●​
+HTTP 200: OK — status code confirming a request was successfully received and processed. 
+●​
+HTTP 403: Forbidden — returned when a device SSAID is not in the approved devices table. 
+●​
+JSON: JavaScript Object Notation — data format for all request and response payloads. 
+●​
+JWT: JSON Web Token — a compact, self-contained token format for stateless client-server 
+authentication. A candidate auth mechanism for Tx 4.1, pending finalization by Member 1. 
+●​
+RBAC: Role-Based Access Control — access control model where permissions are granted based on 
+assigned roles rather than individual identity. Implemented via Spring Security. 
+●​
+CSV: Comma-Separated Values — tabular text format used for single-session and batch exports in Tx 4.5; 
+must conform to the 14-column GQ-RIS schema. 
+●​
+PDF: Portable Document Format — one of three single-session export formats supported in Tx 4.5. 
+●​
+SSAID: Android Settings.Secure.ANDROID_ID; a persistent unique identifier tied to the device and app 
+signing key, used to identify the device to the server. 
+●​
+LAN: Local Area Network; the WiFi network over which all AmyLens communication occurs. No internet 
+connectivity is used or permitted. 
+ 
+Module 4 
+●​
+React: JavaScript UI library used to build the web dashboard; tech stack subject to finalization by Member 
+1 per the open flag in Module 4. 
+●​
+localStorage: Browser-native key-value storage API used by the web dashboard to persist the 
+authentication session token on the client side. 
+●​
+QR Code: Quick Response code — a 2D matrix barcode encoding the server base URL, generated 
+client-side by the dashboard during device setup (Tx 4.2). 
+●​
+LAN: Local Area Network; the WiFi network over which all AmyLens communication occurs. No internet 
+connectivity is used or permitted. 
+●​
+GQ-RIS: Grain Quality - Rice Information System — historical rice quality database mirrored locally; used 
+for historical comparison and data export formatting. 
+●​
+CSV: Comma-Separated Values — tabular text format used for single-session and batch exports in Tx 4.5; 
+must conform to the 14-column GQ-RIS schema. 
+●​
+PDF: Portable Document Format — one of three single-session export formats supported in Tx 4.5. 
+●​
+JSON: JavaScript Object Notation — data format for all request and response payloads. 
+●​
+HTTPS: Hypertext Transfer Protocol Secure — HTTP over TLS; required for all Module 3 communications 
+(used by Module 4 for API calls). 
+●​
+TLS: Transport Layer Security — cryptographic protocol securing all server connections. 
+●​
+SSAID: Android Settings.Secure.ANDROID_ID; a persistent identifier used to authorize specific tablets. 
+●​
+Flagged Session: A session marked as "needs_review" due to statistical deviation (mu +/- 2 sigma), 
+insufficient historical data (fewer than 3 records), or low AI confidence (below 85%). 
+          3 
+
+
+=== PAGE 009 ===
+ 
+ 
+ 
+ 
+  
+References 
+ 
+Module 1 
+ 
+●​
+Android CameraX (Jetpack): https://developer.android.com/training/camerax 
+●​
+Android Storage Access Framework / MediaStore API: 
+https://developer.android.com/guide/topics/providers/document-provider 
+●​
+OpenCV for Android: https://docs.opencv.org 
+ 
+Module 2 
+●​
+Android SQLite: https://developer.android.com/training/data-storage/sqlite 
+ 
+Module 3 
+●​
+iText 7: https://itextpdf.com/en/resources/documentation 
+●​
+OpenCSV: https://opencsv.sourceforge.net/ 
+●​
+PostgreSQL JDBC Driver: https://jdbc.postgresql.org/documentation/ 
+●​
+RFC 7231 (HTTP/1.1): https://datatracker.ietf.org/doc/html/rfc7231 
+●​
+RFC 8446 (TLS 1.3): https://datatracker.ietf.org/doc/html/rfc8446 
+●​
+Spring Boot: https://docs.spring.io/spring-boot/docs/current/reference/html/ 
+●​
+Spring Data JPA: https://docs.spring.io/spring-data/jpa/docs/current/reference/html/ 
+●​
+Spring Security: https://docs.spring.io/spring-security/reference/index.html 
+●​
+PlantUML (design documentation): https://plantuml.com/ 
+ 
+Module 4 
+●​
+React: https://react.dev/ 
+●​
+Qrcode.react: https://www.npmjs.com/package/qrcode.react 
+●​
+Recharts: https://recharts.org/ 
+●​
+TanStack Table (react-table): https://tanstack.com/table/v8 
+ 
+          4 
+
+
+=== PAGE 010 ===
+ 
+ 
+2.​ Architectural Design​
+ 
+ 
+          5 
+
+
+=== PAGE 011 ===
+ 
+ 
+3.​ Detailed Design                                                                                           
+ 
+ Module 1​
+ 
+1.1​Pre-Transaction Setup (One-Time) 
+●​
+User Interface Design 
+ 
+​
+​
+T1.1 QR Scan 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Front-end component(s) 
+o​ QRScannerScreen 
+▪​
+Presents a camera preview for QR scanning. On successful decode, extracts the 
+server base URL from the QR payload and passes it to ServerConfigRepository for 
+persistent storage. Displays a retry prompt on decode failure. 
+▪​
+Type: Jetpack Compose Screen (Composable) 
+o​ ServerConfigRepository 
+▪​
+Stores and retrieves the server base URL from device local config 
+(SharedPreferences or equivalent). Provides a single source of truth for the base 
+URL used by all network calls. 
+▪​
+Type: Kotlin class · SharedPreferences 
+          6 
+
+
+=== PAGE 012 ===
+ 
+o​ AuthorizationCheckScreen 
+▪​
+On every app launch after setup, reads the device SSAID and calls the server 
+authorization endpoint via DeviceAuthRepository. Displays a waiting indicator 
+(PENDING), proceeds to Tx 1.1 (APPROVED), or shows a blocked message 
+(DENIED). 
+▪​
+Type: Kotlin · Jetpack Compose Composable 
+o​ DeviceAuthRepository 
+▪​
+Wraps the device authorization API call. Returns an AuthStatus value to 
+AuthorizationCheckScreen. 
+▪​
+Type: Kotlin class · Retrofit / OkHttp 
+o​ AuthStatus 
+▪​
+Enum with values: PENDING, APPROVED, DENIED. 
+▪​
+Type: Kotlin enum class 
+●​
+Back-end component(s) 
+o​ QR scan sub-flow 
+▪​
+Not applicable 
+o​ Authorization check sub-flow 
+▪​
+External. The authorization endpoint is owned by Module 3 (Tx 3.3). 
+DeviceAuthRepository calls POST /api/devices/auth with body { ssaid: String }. 
+Returns APPROVED, PENDING, or DENIED. HTTP 200 on success, 403 if the 
+device is not in the approved devices table. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          7 
+
+
+=== PAGE 013 ===
+ 
+ 
+ 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          8 
+
+
+=== PAGE 014 ===
+ 
+●​
+Data Design 
+o​ Not applicable 
+1.2​Image Acquisition 
+●​
+User Interface Design 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          9 
+
+
+=== PAGE 015 ===
+ 
+ 
+ 
+ 
+●​
+Front-end component(s) 
+o​ ImageInputScreen 
+▪​
+Entry screen for image acquisition. Presents two options: capture via the rear 
+camera using CameraX, or select a JPEG from device storage using the Storage 
+Access Framework. On image receipt, passes the image in memory to Tx 1.2. 
+▪​
+Type: Kotlin · Jetpack Compose Composable 
+o​ CameraManager 
+▪​
+Wraps CameraX. Configures the rear-facing camera capture use case, triggers 
+capture, and returns the JPEG bitmap/byte array to ImageInputScreen. 
+▪​
+Type: Kotlin class · CameraX 
+o​ FilePickerManager 
+▪​
+Wraps the Android SAF file picker. Launches the document picker intent, receives 
+the selected URI, decodes it to a JPEG bitmap, and returns it to ImageInputScreen. 
+▪​
+Type: Kotlin class · Storage Access Framework (SAF) 
+●​
+Back-end component(s) 
+o​ Not applicable 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+o​ Sequence Diagram 
+▪​
+Not applicable 
+●​
+Data Design 
+          
+10 
+
+
+=== PAGE 016 ===
+ 
+o​ Not applicable 
+1.3​Validation 
+●​
+User Interface Design 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+11 
+
+
+=== PAGE 017 ===
+ 
+ 
+ 
+ 
+●​
+Front-end component(s) 
+o​ ValidationFeedbackView 
+▪​
+Displays the result of each validation check in sequence. Shows a 
+processing/loading state while checks are running. On failure, displays the rejection 
+code (TOO_DARK, TOO_BRIGHT, BLURRY, or NO_GRAINS) and a retry button. 
+On success, advances automatically. 
+▪​
+Type: Kotlin · Jetpack Compose Composable 
+●​
+Back-end component(s) 
+o​ Not applicable 
+●​
+Object-Oriented Components 
+o​ Validation Thresholds: The SRS specifies rejection codes but does not define numeric 
+thresholds. The following are defined here as design decisions and must be validated 
+against the labeled test set (≥95% accuracy on 100 images per the SRS non-functional 
+constraint). 
+ 
+Brightness 
+Mean pixel intensity (0–255). <50 → TOO_DARK / >220 → TOO_BRIGHT. 
+Sharpness 
+Laplacian variance. <100 → BLURRY. 
+Grain 
+Presence 
+ % of image area occupied by detected grain contours. <10% → 
+NO_GRAINS. 
+ 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+12 
+
+
+=== PAGE 018 ===
+ 
+ 
+ 
+ 
+ 
+ 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Data Design 
+o​ Not applicable 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+13 
+
+
+=== PAGE 019 ===
+ 
+ 
+ 
+ 
+1.4​Data Handoff 
+●​
+User Interface Design 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Front-end component(s) 
+o​ SegmentationResultView 
+▪​
+Displays a processing indicator while GrainSegmenter and ColorSpaceConverter 
+run. On completion, shows the number of grains detected as a summary before the 
+in-memory handoff to Module 2. 
+▪​
+Type: Kotlin · Jetpack Compose Composable 
+●​
+Back-end component(s) 
+o​ Not applicable 
+ 
+ 
+ 
+ 
+          
+14 
+
+
+=== PAGE 020 ===
+ 
+ 
+ 
+ 
+ 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+15 
+
+
+=== PAGE 021 ===
+ 
+ 
+ 
+●​
+Data Design 
+o​ Not applicable 
+ Module 2​
+ 
+​
+2.1 Metadata Selection 
+●​
+User Interface Design 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Front-end component(s) 
+o​ MetadataSelectionScreen 
+▪​
+A form-based interface that fetches authorized users and rice varieties. It validates 
+that all fields are populated before proceeding to classification 
+▪​
+Type: Kotlin · Jetpack Compose Composable 
+●​
+Back-end component(s) 
+o​ Authorized Users Endpoint (GET /users?device_id={SSAID}): 
+▪​
+Owned by Module 3. Returns a JSON list of researcher names assigned to the 
+device. 
+▪​
+Type: Spring MVC REST endpoint · DeviceController 
+          
+16 
+
+
+=== PAGE 022 ===
+ 
+o​ Varieties List Endpoint (GET /varieties): 
+▪​
+Owned by Module 3. Returns the list of registered rice varieties. 
+▪​
+Type: Spring MVC REST endpoint · VarietyController 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Data Design 
+​
+ 
+ 
+ 
+ 
+          
+17 
+
+
+=== PAGE 023 ===
+ 
+ 
+ 
+ 
+ 
+2.2​On-Device Amylose Classification 
+●​
+User Interface Design 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Front-end component(s) 
+o​ ClassificationProgressView 
+▪​
+Shows processing state during local inference. 
+▪​
+Type: Kotlin · Jetpack Compose Composable 
+●​
+Back-end component(s) 
+o​ Not applicable 
+ 
+          
+18 
+
+
+=== PAGE 024 ===
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Data Design 
+o​ Not applicable 
+ 
+ 
+ 
+          
+19 
+
+
+=== PAGE 025 ===
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+2.3​Result Display 
+●​
+User Interface Design 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Front-end component(s) 
+o​ ResultScreen 
+▪​
+Renders classification results; offers Submit or Retake. 
+▪​
+Type: Kotlin · Jetpack Compose Composable 
+●​
+Back-end component(s) 
+o​ Not applicable 
+●​
+Object-Oriented Components 
+          
+20 
+
+
+=== PAGE 026 ===
+ 
+o​ Class Diagram 
+▪​
+ Not applicable 
+o​ Sequence Diagram 
+▪​
+Not applicable 
+●​
+Data Design 
+o​ Not applicable 
+2.4​Session Submission to Server 
+●​
+User Interface Design 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Front-end component(s) 
+o​ SubmissionManager 
+▪​
+Submits the session result and metadata to the backend via POST 
+/api/sessions. 
+▪​
+Type: Kotlin class · Retrofit / OkHttp · Room / SQLite · Kotlin Coroutines · Hilt 
+(injected) 
+●​
+Back-end component(s) 
+          
+21 
+
+
+=== PAGE 027 ===
+ 
+o​ POST /api/sessions (Owned by Module 3). 
+▪​
+Description and purpose 
+▪​
+Type: Spring MVC REST endpoint · SessionController 
+ 
+ 
+ 
+ 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+22 
+
+
+=== PAGE 028 ===
+ 
+ 
+●​
+Data Design 
+ 
+ 
+2.5​Offline Queue & Retry (Exponential Backoff) 
+●​
+User Interface Design 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Front-end component(s) 
+o​ QueueStatusBanner 
+          
+23 
+
+
+=== PAGE 029 ===
+ 
+▪​
+Shows count of pending uploads.  
+▪​
+Type: Kotlin · Jetpack Compose Composable 
+●​
+Back-end component(s) 
+o​ POST /api/sessions (Same endpoint as Tx 2.4). 
+▪​
+Description and purpose 
+▪​
+Type: Spring MVC REST endpoint · SessionController 
+ 
+ 
+ 
+ 
+ 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+24 
+
+
+=== PAGE 030 ===
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Data Design 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+2.6​Settings Screen 
+●​
+User Interface Design 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Front-end component(s) 
+o​ SettingsScreen 
+▪​
+Displays SSAID and Server URL.  
+▪​
+Type: Kotlin · Jetpack Compose Composable 
+●​
+Back-end component(s) 
+o​ Not applicable 
+          
+25 
+
+
+=== PAGE 031 ===
+ 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+▪​
+ Not applicable 
+o​ Sequence Diagram 
+▪​
+Not applicable  
+●​
+Data Design 
+o​ ERD or schema 
+▪​
+Not applicable 
+          
+26 
+
+
+=== PAGE 032 ===
+ 
+ Module 3                                                                                                                                  a 
+3.1​Session Ingestion 
+●​
+User Interface Design 
+o​  Not applicable 
+●​
+Front-end component(s) 
+o​ Not applicable 
+●​
+Back-end component(s) 
+o​ SessionController 
+▪​
+REST controller exposing POST /api/sessions. Receives the session payload from 
+Module 2, delegates to SessionService, and returns HTTP 200 or 403. 
+▪​
+Type: Spring @RestController. 
+o​ SessionService 
+▪​
+Validates the incoming device_ssid against the devices table, persists the session 
+record with status PENDING, and triggers AnomalyDetectionService 
+asynchronously. 
+▪​
+ Type: Spring @Service. 
+o​ SessionRepository 
+▪​
+JPA repository interface for CRUD operations on the sessions table.  
+▪​
+Type: Spring Data JpaRepository<Session, Long>. 
+o​ DeviceRepository 
+▪​
+JPA repository used by SessionService to validate device approval status. 
+▪​
+Type: Spring Data JpaRepository<Device, Long>. 
+o​ Session 
+▪​
+JPA entity representing the canonical server-side session record. Owns the 
+sessions table definition. 
+▪​
+Type: Spring @Entity. 
+o​ SessionRequestDTO 
+▪​
+Inbound session payload from Module 2. Fields: deviceSsaid, userName, variety, 
+amyloseClass, confidenceScore, capturedAt, submittedAt, trialStage, season, 
+imageHash 
+▪​
+Type: Java POJO / @RequestBody. 
+ 
+          
+27 
+
+
+=== PAGE 033 ===
+ 
+ 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+28 
+
+
+=== PAGE 034 ===
+ 
+ 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Data Design 
+o​ The sessions table is the canonical server-side definition. Modules 1 and 2 reference this as 
+a stub. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+29 
+
+
+=== PAGE 035 ===
+ 
+ 
+3.2​Anomaly Detection Processing 
+●​
+User Interface Design 
+o​ Not applicable 
+●​
+Front-end component(s) 
+o​  Not applicable 
+●​
+Back-end component(s) 
+o​ AnomalyDetectionService 
+▪​
+Receives a persisted Session object. Looks up historical GQ-RIS records for the 
+same variety. Computes mean and standard deviation. Applies the three flagging 
+rules and writes the verdict and verdict_reason back to the sessions table.  
+▪​
+Type: Spring @Service, @Async. 
+o​ GqrisMirrorRepository 
+▪​
+ JPA repository for read-only access to the gqris_mirror table. Provides historical 
+amylose ordinal records filtered by variety. 
+▪​
+Type: Spring Data JpaRepository<GqrisMirror, Long>. 
+o​ AnomalyResult 
+▪​
+Internal value object carrying the computed verdict and verdict_reason before 
+writing back to the Session entity.  
+▪​
+Type: Java record / POJO. 
+o​ GqrisMirror 
+▪​
+JPA entity representing one historical record from the GQ-RIS mirror table.  
+▪​
+Type: Spring @Entity. 
+●​
+Anomaly Detection Rules 
+ 
+Rule 
+Condition 
+Verdict 
+verdict_reason 
+Insufficient data 
+Fewer than 3 historical records 
+for the variety 
+needs_review 
+insufficient_data 
+Statistical 
+deviation 
+Ordinal falls outside mean +/- 
+2 standard deviations 
+needs_review 
+deviation 
+Low confidence 
+confidence < 85 (regardless of 
+statistical outcome) 
+needs_review 
+low_confidence 
+Consistent 
+None of the above conditions 
+met 
+verified 
+— 
+          
+30 
+
+
+=== PAGE 036 ===
+ 
+Amylose Ordinal mapping: Waxy=1, Low=2, Intermediate=3, High=4. 
+ 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Data Design 
+ 
+ 
+ 
+          
+31 
+
+
+=== PAGE 037 ===
+ 
+ 
+3.3​Device Registration, Authorized  & User List 
+●​
+User Interface Design 
+o​ Not applicable 
+●​
+Front-end component(s) 
+o​ Not applicable 
+●​
+Back-end component(s) 
+o​ DeviceController 
+▪​
+REST controller exposing POST /api/devices/register, POST /api/devices/auth, 
+GET /api/devices/{deviceId}/users, GET /api/devices, PUT 
+/api/devices/{id}/approve, PUT /api/devices/{id}/deny. Delegates to DeviceService. 
+▪​
+Type: Spring @RestController. 
+o​ DeviceService 
+▪​
+Handles device registration (creates PENDING record), authorization check 
+(returns APPROVED/PENDING/DENIED status), and user list retrieval. 
+▪​
+Type: Spring @Service. 
+o​ DeviceRepository 
+▪​
+JPA repository for CRUD operations on the devices table. Type: Spring Data 
+JpaRepository<Device, Long>. 
+▪​
+Type: Spring Data JpaRepository<Device, Long>. 
+o​ Device 
+▪​
+JPA entity representing a registered device. 
+▪​
+Type: Spring @Entity. 
+o​ VarietiesController 
+▪​
+REST controller exposing GET /api/varieties. Returns the full list of registered 
+variety names.  
+▪​
+Type: Spring @RestController. 
+o​ VarietiesRepository 
+▪​
+JPA repository for read-only access to the varieties table.  
+▪​
+Type: Spring Data JpaRepository<Variety, Long>. 
+o​ Variety 
+▪​
+JPA entity representing one registered rice variety.  
+          
+32 
+
+
+=== PAGE 038 ===
+ 
+▪​
+Type: Spring @Entity. 
+o​ DeviceRegistrationDTO 
+▪​
+Inbound payload for POST /api/devices/register.  
+▪​
+Fields: ssaid, deviceLabel.  
+▪​
+Type: Java POJO / @RequestBody. 
+o​ DeviceAuthRequestDTO 
+▪​
+Inbound payload for POST /api/devices/auth. 
+▪​
+Fields: ssaid.  
+▪​
+Type: Java POJO / @RequestBody. 
+o​ UserListResponseDTO 
+▪​
+Outbound payload for GET /api/devices/{deviceId}/users.  
+▪​
+Fields: userNames (List<String>).  
+▪​
+Type: Java POJO / @ResponseBody. 
+o​ VarietiesResponseDTO 
+▪​
+Outbound payload for GET /api/varieties.  
+▪​
+Fields: varieties (List<{ id, name, description }>).  
+▪​
+Type: Java POJO / @ResponseBody. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+33 
+
+
+=== PAGE 039 ===
+ 
+ 
+ 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+34 
+
+
+=== PAGE 040 ===
+ 
+ 
+ 
+ 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Data Design 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+35 
+
+
+=== PAGE 041 ===
+ 
+ 
+●​ 3.3b Password Reset 
+○​
+Endpoint: POST /api/auth/reset. Caller: Module 4.  
+○​
+Auth: requires a valid Spring Security session (HttpOnly cookie). Allows an authenticated team lead 
+to change their own password. 
+○​
+Request body: { "currentPassword": "string", "newPassword": "string" }. 
+○​
+Response codes: 200 OK (password updated), 400 Bad Request (new password fails validation — 
+min 8 chars), 401 Unauthorized (wrong current password or no active session). 
+○​
+Back-end Components 
+■​
+AuthController  
+●​
+Adds resetPassword(@RequestBody PasswordResetDTO dto, HttpSession 
+session): ResponseEntity. Delegates to AuthService.  
+●​
+Type: Spring @RestController (extends existing Tx 3.3 controller). 
+■​
+AuthService  
+●​
+Adds resetPassword(username: String, currentPassword: String, newPassword: 
+String): void. Verifies currentPassword against stored BCrypt hash, validates 
+newPassword length, re-hashes and persists. Throws UnauthorizedException on 
+wrong current password.  
+●​
+Type: Spring @Service (extends existing Tx 3.3 service). 
+■​
+UserRepository  
+●​
+Existing JPA repository; uses save(User) to persist the updated password hash. No 
+new repository needed. 
+■​
+PasswordResetDTO 
+●​
+Inbound payload. Fields: currentPassword (String), newPassword (String). 
+●​
+Type: Java POJO / @RequestBody. 
+○​
+Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+36 
+
+
+=== PAGE 042 ===
+ 
+ 
+ 
+3.4​Dashboard Data Request 
+●​
+User Interface Design 
+o​ Not applicable 
+●​
+Front-end component(s) 
+o​ Not applicable 
+●​
+Back-end component(s) 
+o​ DashboardController 
+▪​
+REST controller exposing GET /api/devices, GET /api/sessions, GET /api/analytics. 
+Requires valid Spring Security session.  
+▪​
+Type: Spring @RestController.  
+o​ AnalyticsService 
+▪​
+Computes session counts by amylose class, season, and year (trend chart); and 
+amylose results over time for a selected variety with GQ-RIS historical mean 
+(variety consistency chart). Operates only on verified sessions.  
+▪​
+Type: Spring @Service.  
+o​ SessionService 
+▪​
+Reused from Tx 3.1. Extended with findAll(filters) for dashboard session list 
+queries.  
+▪​
+Type: Spring @Service. 
+o​ DeviceService 
+▪​
+Reused from Tx 3.3. Extended with findAll() for dashboard device list queries.  
+▪​
+Type: Spring @Service. 
+o​ SessionFilterParams 
+▪​
+Query parameter object for filtering session list: variety, status, date range.  
+▪​
+Type: Spring @ModelAttribute. 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+37 
+
+
+=== PAGE 043 ===
+ 
+ 
+ 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Note: Analytics queries operate only on sessions with verdict = verified, consistent with the shared proposal. 
+ 
+          
+38 
+
+
+=== PAGE 044 ===
+ 
+●​
+Data Design 
+o​ Not applicable 
+3.5​Session Review Action 
+●​
+User Interface Design 
+o​ Not applicable 
+●​
+Front-end component(s) 
+o​ Not applicable 
+●​
+Back-end component(s) 
+o​ SessionReviewController 
+▪​
+REST controller exposing POST /api/sessions/{id}/review. Requires valid session. 
+Receives action, reviewer identity, and mandatory note for Reject.  
+▪​
+Type: Spring @RestController. 
+o​ SessionReviewService 
+▪​
+Locates the target session by ID. Validates the mandatory note for Reject actions. 
+Updates the session status, reviewer identity, timestamp, and note.  
+▪​
+Type: Spring @Service. 
+o​ SessionReviewRequestDTO 
+▪​
+Carries the inbound review payload: action (ACCEPT or REJECT), reviewerIdentity, 
+and reviewerNote.  
+▪​
+Type: Java POJO / @RequestBody. 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+39 
+
+
+=== PAGE 045 ===
+ 
+ 
+ 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Data Design 
+o​ Not applicable 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+40 
+
+
+=== PAGE 046 ===
+ 
+ 
+ 
+3.6​Data Export (14-column GQ-RIS Schema) 
+●​
+User Interface Design 
+o​ Not applicable 
+●​
+Front-end component(s) 
+o​ Not applicable 
+●​
+14-Column GQ-RIS Schema Mapping 
+ 
+Col# 
+GQ-RIS Column 
+Name 
+Source Field 
+Notes 
+1 
+NO. 
+sessions.session_id  
+Session ID used as record number 
+2 
+VARIETY NAME 
+sessions.variety 
+ 
+3 
+YEAR APPROVED 
+— 
+Blank — not captured by system 
+4 
+GROUPING 
+— 
+Blank — not captured by system 
+5 
+BROWN RICE 
+— 
+Blank — not captured by system 
+6 
+TOTAL MILLED RICE 
+— 
+Blank — not captured by system 
+7 
+HEAD RICE 
+— 
+Blank — not captured by system 
+8 
+CHALKY 
+— 
+Blank — not captured by system 
+9 
+GRAIN LENGTH 
+— 
+Blank — not captured by system 
+10 
+GRAIN SHAPE 
+— 
+Blank — not captured by system 
+11 
+AMYLOSE 
+sessions.amylose_cl
+ass 
+Blank — not captured by system 
+12 
+GEL TEMP 
+— 
+ 
+13 
+%ACCEPTABILITY 
+(RAW) 
+— 
+Blank — not captured by system 
+14 
+%ACCEPTABILITY 
+(COOKED 
+— 
+Blank — not captured by system 
+ 
+●​
+Back-end component(s) 
+o​ ExportController 
+▪​
+REST controller exposing GET /api/sessions/export. Accepts: format (csv/json/pdf), 
+optional filters. Requires valid session.  
+          
+41 
+
+
+=== PAGE 047 ===
+ 
+▪​
+Type: Spring @RestController.  
+o​ ExportService 
+▪​
+Queries sessions table, maps records to 14-column schema, delegates to 
+formatter. 
+▪​
+Type: Spring @Service. 
+o​ CsvExportFormatter 
+▪​
+Serialises to CSV via OpenCSV.  
+▪​
+Type: Spring @Component. 
+o​ PdfExportFormatter 
+▪​
+Serialises to PDF via iText 7.  
+▪​
+Type: Spring @Component. 
+o​ JsonExportFormatter 
+▪​
+Serialises to JSON via Jackson. 
+▪​
+ Type: Spring @Component. 
+o​ ExportRecord 
+▪​
+Internal DTO mapping a Session to the 14-column schema. Uncaptured fields are 
+empty strings.  
+▪​
+Type: Java POJO. 
+ 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+42 
+
+
+=== PAGE 048 ===
+ 
+ 
+ 
+ 
+ 
+ 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Data Design 
+o​ Not applicable 
+ 
+ 
+3.7​Reference Data Mirror Management 
+●​
+User Interface Design 
+o​ Not applicable 
+●​
+Front-end component(s) 
+o​ Not applicable 
+●​
+Back-end component(s) 
+o​ GqrisImportController 
+▪​
+REST controller exposing POST /api/admin/gqris/import. Accepts multipart CSV. 
+Requires valid session.  
+▪​
+Type: Spring @RestController. 
+o​ GqrisImportService 
+▪​
+Parses CSV, validates rows (variety, amyloseOrdinal, year), truncates gqris_mirror 
+          
+43 
+
+
+=== PAGE 049 ===
+ 
+table, inserts all valid records.  
+▪​
+Type: Spring @Service. 
+o​ GqrisMirrorRepository 
+▪​
+Reused from Tx 3.2. Extended with deleteAll() and saveAll().  
+▪​
+Type: Spring Data JpaRepository<GqrisMirror, Long>. 
+o​ GqrisImportResultDTO 
+▪​
+Outbound payload. Fields: rowsImported, rowsSkipped, errors.  
+▪​
+Type: Java POJO / @ResponseBody. 
+ 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+44 
+
+
+=== PAGE 050 ===
+ 
+ 
+ 
+ 
+ 
+ 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Data Design 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          
+45 
+
+
+=== PAGE 051 ===
+ 
+ Module 4​
+ 
+Pre-Transaction Setup (One-Time) 
+●​
+Environmental Requirement — Browser Certificate Trust 
+●​
+All Module 4 transactions are served over HTTPS (port 443) on the LAN. Before the dashboard can be 
+opened in any workstation browser, the internal CA root certificate issued by the Spring Boot server must 
+be manually installed and trusted. This is a one-time step per workstation and is a prerequisite for all 
+transactions in this module. 
+●​
+Procedure: 
+○​
+Chrome / Edge 
+■​
+Open Settings → Privacy and Security → Security. 
+■​
+Click Manage Certificates → Trusted Root Certification Authorities. 
+■​
+Click Import, select the .crt file provided by the system administrator, and complete the 
+wizard. 
+■​
+Restart the browser. 
+○​
+Firefox 
+■​
+Open Settings → Privacy & Security → Certificates. 
+■​
+Click View Certificates → Authorities → Import. 
+■​
+Select the .crt file, enable "Trust this CA to identify websites." 
+■​
+Restart the browser. 
+●​
+Scope:  
+○​
+This is a deployment and environmental setup step. The dashboard application does not handle 
+certificate distribution. The .crt file is generated and distributed by the Module 3 system 
+administrator. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          46 
+
+
+=== PAGE 052 ===
+ 
+ 
+4.1​Administrative Authentication 
+●​
+User Interface Design 
+​
+T4.1 — Login screen 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+​
+T4.1 — Password Reset 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          47 
+
+
+=== PAGE 053 ===
+ 
+ 
+ 
+●​
+Front-end component(s) 
+o​ Login Page 
+▪​
+Manages administrative credential input and orchestrates the mandatory password reset 
+flow. 
+▪​
+Type: React Page. 
+o​ AuthContext 
+▪​
+A global state provider that manages the HttpOnly session cookie. 
+▪​
+The frontend does not handle tokens manually as they are managed by the browser 
+once set by the server. 
+▪​
+Type: React Context. 
+●​
+Back-end component(s) 
+o​ Auth Endpoint 
+▪​
+Validates credentials via POST /api/auth/login, handles logouts via POST 
+/api/auth/logout, and processes resets via POST /api/auth/reset. 
+▪​
+External: Owned by Module 3. 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+          48 
+
+
+=== PAGE 054 ===
+ 
+​
+ 
+ 
+ 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          49 
+
+
+=== PAGE 055 ===
+ 
+ 
+ 
+ 
+●​
+Data Design 
+o​ Not applicable 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+4.2​Device Registration & Management 
+●​
+User Interface Design 
+ 
+T4.2 - Device Management 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          50 
+
+
+=== PAGE 056 ===
+ 
+ 
+ 
+●​
+Front-end component(s) 
+o​ DeviceManagementPage 
+▪​
+Renders the management tables and handles status toggles. 
+▪​
+Type: React Page. 
+o​ DeviceCard 
+▪​
+Renders individual device details and action buttons. 
+▪​
+Type: React Component 
+o​
+QRCodeGenerator 
+▪​
+Uses the qrcode.react library to encode exactly https://<server-ip>:443 (no trailing slash 
+or path) for mobile device initialization. 
+▪​
+Type: React Component 
+o​ GqrisImportTrigger 
+▪​
+A protected UI button that allows the Team Lead to upload the historical CSV mirror to 
+the server. 
+▪​
+Type: React Component 
+●​
+Back-end component(s) 
+o​ Device Routes 
+▪​
+Endpoints for fetching lists (GET /api/devices) and updating registration/approval status 
+(POST /api/devices/{id}/status). 
+▪​
+External: Owned by Module 3. 
+o​ GQ-RIS Import Route 
+▪​
+Accepts the multipart CSV file via POST /api/admin/gqris/import. 
+▪​
+External: Owned by Module 3. 
+o​ N/A (QR Generation) 
+▪​
+The QR code is generated entirely client-side 
+▪​
+No server call is required. 
+          51 
+
+
+=== PAGE 057 ===
+ 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+o​ Sequence Diagram 
+          52 
+
+
+=== PAGE 058 ===
+ 
+ 
+ 
+ 
+●​
+Data Design 
+o​ Not applicable 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+4.3​Flagged Session Review 
+●​
+User Interface Design​  
+​
+T4.3 - Flagged Sessions 
+          53 
+
+
+=== PAGE 059 ===
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+​
+T4.3 - Flagged Session - Approve/Rejection Modal 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+​
+T4.3 - Flagged Session - Rejection Success State 
+ 
+ 
+          54 
+
+
+=== PAGE 060 ===
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+​
+T4.3 - Flagged Session - Approve Success State 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Front-end component(s) 
+o​ FlaggedSessionsPage 
+▪​
+Orchestrates the display and review of anomalous data. 
+          55 
+
+
+=== PAGE 061 ===
+ 
+▪​
+Type: React Page. 
+o​ ReviewModal 
+▪​
+Captures the mandatory justification for session rejections. 
+▪​
+Type: React Component. 
+●​
+Back-end component(s) 
+o​ Session Review Route 
+▪​
+Updates review_status and review_notes via POST /api/sessions/{id}/review. 
+▪​
+External: Owned by Module 3. 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+o​ Sequence Diagram 
+          56 
+
+
+=== PAGE 062 ===
+ 
+                         
+ 
+ 
+●​
+Data Design 
+o​ Not applicable 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+4.4​Analytics Visualization 
+          57 
+
+
+=== PAGE 063 ===
+ 
+●​
+User Interface Design 
+​
+T4.4 - Analytics Visualization 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Front-end component(s) 
+o​ AnalyticsPage 
+▪​
+Host container for visualization tools. 
+▪​
+Type: React Page. 
+o​ TrendChartView(Bar) and ConsistencyChartView(Line) 
+▪​
+Render data using a Recharts library. 
+▪​
+Type:React Components. 
+●​
+Back-end component(s) 
+o​ Analytics Routes 
+▪​
+Fetches aggregated data via GET /api/analytics. 
+▪​
+External: Owned by Module 3. 
+●​
+Object-Oriented Components 
+          58 
+
+
+=== PAGE 064 ===
+ 
+o​ Class Diagram 
+▪​
+Not applicable 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Data Design 
+o​ Not applicable 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          59 
+
+
+=== PAGE 065 ===
+ 
+4.5​Standardized Data Export 
+●​
+User Interface Design 
+ 
+T4.5 - Standardized Data Export 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+T4.5 - Standardized Data Export - Processing State 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+          60 
+
+
+=== PAGE 066 ===
+ 
+​
+T4.5 - Standardized Data Export - Batch Export Configuration 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Front-end component(s) 
+o​ ExportControls 
+▪​
+Triggers file generation and handles browser downloads. 
+▪​
+Type: React Component. 
+●​
+Back-end component(s) 
+o​ Export Route 
+▪​
+Maps session records to the 14-column schema via GET /api/sessions/export. 
+▪​
+External: Owned by Module 3. 
+●​
+Object-Oriented Components 
+o​ Class Diagram 
+▪​
+Not applicable 
+ 
+ 
+ 
+          61 
+
+
+=== PAGE 067 ===
+ 
+o​ Sequence Diagram 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●​
+Data Design 
+o​ Not applicable 
+ 
+          62 
+
+
