@@ -83,8 +83,8 @@ export const api = {
     return request(`/api/sessions${qs ? `?${qs}` : ''}`)
   },
 
-  reviewSession: (id, { action, reviewerNote } = {}) =>
-    request(`/api/sessions/${id}/review`, { method: 'POST', body: { action, reviewerNote } }),
+  reviewSession: (id, { action, reviewerNote, reviewerIdentity } = {}) =>
+      request(`/api/sessions/${id}/review`, { method: 'POST', body: { action, reviewerNote, reviewerIdentity } }),
 
   getAnalytics: () => request('/api/analytics'),
   exportSessions: ({ format = 'csv', variety, status } = {}) => {
