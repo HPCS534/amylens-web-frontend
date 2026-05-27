@@ -153,7 +153,7 @@ function DeviceManagementPage({ deviceRegistrations = defaultDeviceRegistrations
 
       
 
-      <section className="section-card">
+      <section className="section-card" style={{ margin: '50px 0px 0px 0px' }}> 
         <div className="section-head">
           <div>
             <h2 className="section-title">Device Management Roster</h2>

@@ -20,6 +20,7 @@ export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(false)
   const [initializing, setInitializing] = useState(true)
+  const [currentUser, setCurrentUser] = useState(null)
 
   useEffect(() => {
     let active = true
@@ -53,6 +54,7 @@ export function AuthProvider({ children }) {
       // verify by calling a protected endpoint
       await api.getAllDevices()
       setIsAuthenticated(true)
+      setCurrentUser({ username })
     } catch (error) {
       if (import.meta.env.DEV && username === 'admin' && password === getDevPassword()) {
         setIsAuthenticated(true)
@@ -76,9 +78,9 @@ export function AuthProvider({ children }) {
       // ignore server logout failures; clear client state regardless
     } finally {
       setIsAuthenticated(false)
+      setCurrentUser(null)
     }
   }
-
-  const value = { isAuthenticated, loading, initializing, login, logout }
+  const value = { isAuthenticated, loading, initializing, login, logout, currentUser }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
