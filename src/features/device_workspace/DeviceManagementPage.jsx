@@ -54,6 +54,23 @@ function statusClass(status) {
 function DeviceManagementPage({ deviceRegistrations = defaultDeviceRegistrations }) {
   const [registrations, setRegistrations] = useState(deviceRegistrations)
   const [selectedRegistration, setSelectedRegistration] = useState(null)
+  const [copied, setCopied] = useState(false)
+
+  const qrValue = useMemo(() => {
+    // Allow explicit override for real device provisioning links.
+    if (import.meta.env.VITE_QR_URL) return import.meta.env.VITE_QR_URL
+
+    // Default to the current frontend host so phones on the same LAN can open it.
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      const host = window.location.hostname
+      const lanHost = import.meta.env.VITE_LAN_HOST
+      const resolvedHost = host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' ? (lanHost || host) : host
+      const port = window.location.port ? `:${window.location.port}` : ''
+      return `${window.location.protocol}//${resolvedHost}${port}/login`
+    }
+
+    return import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api'
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -98,6 +115,16 @@ function DeviceManagementPage({ deviceRegistrations = defaultDeviceRegistrations
     }
   }
 
+  const copyQrUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(qrValue)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1200)
+    } catch {
+      setCopied(false)
+    }
+  }
+
   return (
     <div className="module-grid" aria-label="Device Management Workspace">
       <section className="hero-grid">
@@ -107,7 +134,7 @@ function DeviceManagementPage({ deviceRegistrations = defaultDeviceRegistrations
             <span className="pill-info pill">Active Node</span>
           </div>
           <div className="qr-frame">
-            <QRCodeCanvas value={import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api'} size={220} includeMargin />
+            <QRCodeCanvas value={qrValue} size={220} includeMargin />
           </div>
           <div>
             <h3 className="section-title" style={{ textAlign: 'center' }}>Setup QR Code</h3>
@@ -116,8 +143,8 @@ function DeviceManagementPage({ deviceRegistrations = defaultDeviceRegistrations
             </div>
           </div>
           <div className="qr-url">
-            <span>{import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api'}</span>
-            <button className="ghost-button" type="button">⧉</button>
+            <span>{qrValue}</span>
+            <button className="ghost-button" type="button" onClick={copyQrUrl}>{copied ? '✓' : '⧉'}</button>
           </div>
         </article>
         <section className="hero-stack">
