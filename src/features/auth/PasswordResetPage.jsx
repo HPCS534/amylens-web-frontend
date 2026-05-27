@@ -8,9 +8,9 @@ import './PasswordResetPage.css'
 export default function PasswordResetPage() {
   const navigate = useNavigate()
   const isDev = import.meta.env.DEV
-  const [currentPassword, setCurrentPassword] = useState(isDev ? 'test' : '')
-  const [newPassword, setNewPassword] = useState(isDev ? 'testest1!' : '')
-  const [confirmPassword, setConfirmPassword] = useState(isDev ? 'testest1!' : '')
+  const [currentPassword, setCurrentPassword] = useState('test')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 

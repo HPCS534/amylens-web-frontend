@@ -1,0 +1,127 @@
+.export-page {
+  gap: 1.5rem;
+}
+
+.export-breadcrumb {
+  font-size: 0.78rem;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+}
+
+.section-card {
+  background: transparent;
+}
+
+.export-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.export-summary-panel .card-title,
+.export-governance-card .card-title,
+.card-title {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: #374151;
+}
+
+.export-summary-panel {
+  min-width: 320px;
+  max-width: 360px;
+}
+
+.export-big-number {
+  font-size: 1.6rem;
+  color: white;
+}
+
+.stat-number {
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: #0b3a8c;
+}
+
+.module-table th,
+.module-table td {
+  padding: 0.6rem 0.5rem;
+  font-size: 0.86rem;
+  border-bottom: 1px solid rgba(15,23,42,0.04);
+}
+
+.module-table thead th {
+  color: #374151;
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.export-option {
+  border: 1px solid rgba(15,23,42,0.06);
+  background: #ffffff;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  min-width: 120px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.export-option .card-title {
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+}
+
+.export-option .help-note {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+.export-option.active {
+  border-color: #1e40af;
+  background: linear-gradient(180deg, #ffffff, #fbfdff);
+  box-shadow: 0 1px 0 rgba(13, 42, 148, 0.06);
+}
+
+.primary-button,
+.outline-button,
+.ghost-button {
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.92rem;
+}
+
+.primary-button {
+  background: #1e40af;
+  color: #ffffff;
+  border: none;
+}
+
+.outline-button {
+  border: 1px solid #1e40af;
+  color: #1e40af;
+  background: white;
+}
+
+.ghost-button {
+  border: 1px solid rgba(15,23,42,0.06);
+  color: #374151;
+  background: transparent;
+}
+
+.help-note {
+  color: #6b7280;
+  font-size: 0.86rem;
+}
+
+/* responsive adjustments */
+@media (min-width: 1000px) {
+  .module-grid.export-page {
+    grid-template-columns: 1fr 360px;
+  }
+}
+
+@media (max-width: 999px) {
+  .export-stack { max-width: none; }
+  .export-summary-panel { max-width: none; }
+}

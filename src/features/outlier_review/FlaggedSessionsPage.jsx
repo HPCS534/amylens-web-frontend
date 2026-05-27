@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api/client'
+import { useAuth } from '../auth/AuthProvider'
 import ReviewModal, { ReviewSuccessModal } from './ReviewModal'
 
 const defaultFlaggedSessions = [
@@ -46,6 +47,8 @@ function FlaggedSessionsPage({ sessions = defaultFlaggedSessions, onSubmitReview
     }
   }, [sessions])
 
+  const { currentUser } = useAuth()
+
   const openReview = (analysisSession) => {
     setSelectedSession(analysisSession)
     setReasonComment('')
@@ -79,6 +82,7 @@ function FlaggedSessionsPage({ sessions = defaultFlaggedSessions, onSubmitReview
       await api.reviewSession(sessionId, {
         action,
         reviewerNote: reason.trim() || undefined,
+        reviewerIdentity: currentUser?.username,
       })
     } catch (error) {
       if (!import.meta.env.DEV) throw error
