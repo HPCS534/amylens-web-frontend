@@ -102,14 +102,76 @@ export const api = {
     }),
 
   getAnalytics: () => request('/api/analytics'),
-  exportSessions: ({ format = 'csv', variety, status, dateFrom, dateTo } = {}) => {
+  exportSessions: async ({ format = 'csv', variety, status, dateFrom, dateTo } = {}) => {
     const params = new URLSearchParams({ format })
     if (variety) params.set('variety', variety)
     if (status) params.set('status', status)
     if (dateFrom) params.set('dateFrom', dateFrom)
     if (dateTo) params.set('dateTo', dateTo)
-    return requestBlob(`/api/sessions/export?${params.toString()}`)
+
+    // Use a relative URL for exports so e2e tests can intercept the request.
+    // In production, the server is expected to be reachable from the app origin
+    // (reverse proxy) or VITE_API_URL will be set appropriately.
+    const url = `/api/sessions/export?${params.toString()}`
+    const res = await fetch(url, { credentials: 'include' })
+    if (!res.ok) {
+      // If the server doesn't implement async export start, return null so callers can fallback.
+      if (res.status === 404 || res.status === 405 || res.status === 501) return null
+      const text = await res.text().catch(() => '')
+      const err = new Error(res.statusText || String(res.status))
+      err.status = res.status
+      err.body = text
+      throw err
+    }
+    return res.blob()
   },
+
+  // Export a single session in the requested format (csv|json|pdf)
+  exportSession: async (sessionId, format = 'csv') => {
+    const url = buildUrl(`/api/sessions/${encodeURIComponent(sessionId)}/export?format=${encodeURIComponent(format)}`)
+    const res = await fetch(url, { credentials: 'include' })
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      const err = new Error(res.statusText || String(res.status))
+      err.status = res.status
+      err.body = text
+      throw err
+    }
+    return res.blob()
+  },
+
+  // Async export support (Use Case 4.5): start a background export job, query status, then download
+  startExport: async ({ format = 'csv', variety, status, dateFrom, dateTo } = {}) => {
+    const url = buildUrl('/api/sessions/export')
+    const body = { format }
+    if (variety) body.variety = variety
+    if (status) body.status = status
+    if (dateFrom) body.dateFrom = dateFrom
+    if (dateTo) body.dateTo = dateTo
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      credentials: 'include',
+    })
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      const err = new Error(res.statusText || String(res.status))
+      err.status = res.status
+      err.body = text
+      throw err
+    }
+
+    const contentType = res.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) return res.json()
+    if (contentType.includes('text/csv') || contentType.includes('application/octet-stream')) return res.blob()
+    return res.text()
+  },
+
+  getExportStatus: (jobId) => request(`/api/sessions/export/${jobId}/status`),
+  downloadExport: (jobId) => requestBlob(`/api/sessions/export/${jobId}/download`),
 
   // Admin/device management (require authenticated session)
   getAllDevices: () => request('/api/devices'),

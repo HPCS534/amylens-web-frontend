@@ -27,24 +27,117 @@ export default function ExportPage() {
 
   const exportLabel = useMemo(() => exportTypes.find((entry) => entry.key === format)?.title ?? 'Export', [format])
 
+  const toCsvValue = (value) => {
+    if (value == null) return ''
+    const text = Array.isArray(value) ? value.join('; ') : value instanceof Date ? value.toISOString() : String(value)
+    return `"${text.replace(/"/g, '""')}"`
+  }
+
+  const buildCsvFromSessions = (sessions) => {
+    const rows = Array.isArray(sessions) ? sessions : []
+    const columns = Array.from(
+      rows.reduce((set, row) => {
+        if (row && typeof row === 'object') {
+          Object.keys(row).forEach((key) => set.add(key))
+        }
+        return set
+      }, new Set())
+    )
+
+    if (columns.length === 0) return ''
+
+    const header = columns.join(',')
+    const body = rows
+      .map((row) => columns.map((column) => toCsvValue(row?.[column])).join(','))
+      .join('\n')
+    return `${header}\n${body}`
+  }
+
+  const downloadBatchSessionsCsv = async () => {
+    setLoading(true)
+    setMessage('Preparing batch CSV export…')
+    try {
+      const sessions = await api.getSessions()
+      const csv = buildCsvFromSessions(Array.isArray(sessions) ? sessions : [])
+      if (!csv) throw new Error('No sessions available to export')
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = 'amylens-active-sessions.csv'
+      anchor.click()
+      URL.revokeObjectURL(url)
+      setMessage('Exported all active sessions successfully.')
+    } catch (error) {
+      setMessage(error.message || 'Export failed.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const download = async () => {
     setLoading(true)
     setMessage('Processing export request…')
     try {
-      const blob = await api.exportSessions({
+      // Try async start (preferred per Use Case 4.5)
+      const startResp = await api.startExport({
         format,
         status: status === 'all' ? undefined : status,
         variety: variety === 'all' ? undefined : variety,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
       })
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = `amylens-export.${format}`
-      anchor.click()
-      URL.revokeObjectURL(url)
-      setMessage(`Exported ${exportLabel} successfully.`)
+
+      // If server returned a job id, poll until ready then download
+      if (startResp && typeof startResp === 'object' && startResp.jobId) {
+        const jobId = startResp.jobId
+        setMessage('Export job started — processing…')
+        // Poll status
+        let statusResp = null
+        for (let i = 0; i < 60; i++) {
+          // eslint-disable-next-line no-await-in-loop
+          statusResp = await api.getExportStatus(jobId)
+          if (statusResp && statusResp.status === 'ready') break
+          if (statusResp && statusResp.status === 'failed') throw new Error(statusResp.message || 'Export failed')
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise((r) => setTimeout(r, 2000))
+        }
+        if (!statusResp || statusResp.status !== 'ready') throw new Error('Export did not complete in time')
+        const blob = await api.downloadExport(jobId)
+        const url = URL.createObjectURL(blob)
+        const anchor = document.createElement('a')
+        anchor.href = url
+        anchor.download = `amylens-export.${format}`
+        anchor.click()
+        URL.revokeObjectURL(url)
+        setMessage(`Exported ${exportLabel} successfully.`)
+      } else if (startResp instanceof Blob) {
+        // Server returned the file immediately
+        const url = URL.createObjectURL(startResp)
+        const anchor = document.createElement('a')
+        anchor.href = url
+        anchor.download = `amylens-export.${format}`
+        anchor.click()
+        URL.revokeObjectURL(url)
+        setMessage(`Exported ${exportLabel} successfully.`)
+      } else {
+        // Fallback: older immediate-export endpoint
+        const blob = await api.exportSessions({
+          format,
+          status: status === 'all' ? undefined : status,
+          variety: variety === 'all' ? undefined : variety,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+        })
+        const url = URL.createObjectURL(blob)
+        const anchor = document.createElement('a')
+        anchor.href = url
+        anchor.download = `amylens-export.${format}`
+        anchor.click()
+        URL.revokeObjectURL(url)
+        setMessage(`Exported ${exportLabel} successfully.`)
+      }
     } catch (error) {
       setMessage(error.message || 'Export failed.')
     } finally {
@@ -92,7 +185,7 @@ export default function ExportPage() {
       setDateTo={setDateTo}
       variety={variety}
       setVariety={setVariety}
-      download={download}
+      download={downloadBatchSessionsCsv}
     />
   )
 

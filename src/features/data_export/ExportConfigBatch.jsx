@@ -75,9 +75,9 @@ export default function ExportConfig(props) {
             <p className="help-note">Batch exports apply the selected filters and return a single standardized file.</p>
           </div>
 
-          <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
             <button className="ghost-button" type="button" onClick={() => setViewMode('landing')}>Cancel</button>
-            <button className="outline-button" type="button" onClick={async () => { await download(); setViewMode('processing') }}>Generate Export</button>
+            <button className="primary-button" type="button" onClick={async () => { await download() }}>Start Processing</button>
           </div>
         </div>
       </section>
