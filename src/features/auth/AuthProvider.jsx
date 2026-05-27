@@ -1,8 +1,26 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { api, login as apiLogin } from '../../api/client'
-import { getDevPassword } from './passwordResetState'
 
 const AuthContext = createContext(null)
+const CURRENT_USER_KEY = 'amylens.currentUser'
+
+function readCurrentUser() {
+  try {
+    const stored = window.sessionStorage.getItem(CURRENT_USER_KEY)
+    return stored ? JSON.parse(stored) : null
+  } catch {
+    return null
+  }
+}
+
+function writeCurrentUser(user) {
+  try {
+    if (user) window.sessionStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user))
+    else window.sessionStorage.removeItem(CURRENT_USER_KEY)
+  } catch {
+    // Ignore session storage failures; the backend session remains authoritative.
+  }
+}
 
 export function useAuth() {
   return (
@@ -28,9 +46,15 @@ export function AuthProvider({ children }) {
     async function bootstrap() {
       try {
         await api.getAllDevices()
-        if (active) setIsAuthenticated(true)
+        if (active) {
+          setIsAuthenticated(true)
+          setCurrentUser(readCurrentUser())
+        }
       } catch {
-        if (active) setIsAuthenticated(false)
+        if (active) {
+          setIsAuthenticated(false)
+          setCurrentUser(null)
+        }
       } finally {
         if (active) setInitializing(false)
       }
@@ -45,26 +69,12 @@ export function AuthProvider({ children }) {
   async function login(username, password) {
     setLoading(true)
     try {
-      if (import.meta.env.DEV && username === 'admin' && password === getDevPassword()) {
-        setIsAuthenticated(true)
-        return
-      }
-
       await apiLogin(username, password)
-      // verify by calling a protected endpoint
       await api.getAllDevices()
       setIsAuthenticated(true)
       setCurrentUser({ username })
+      writeCurrentUser({ username })
     } catch (error) {
-      if (import.meta.env.DEV && username === 'admin' && password === getDevPassword()) {
-        setIsAuthenticated(true)
-        return
-      }
-
-      if (import.meta.env.DEV) {
-        console.warn('AmyLens backend login is unavailable in dev; enabling demo mode.', error)
-        throw error
-      }
       throw error
     } finally {
       setLoading(false)
@@ -79,6 +89,7 @@ export function AuthProvider({ children }) {
     } finally {
       setIsAuthenticated(false)
       setCurrentUser(null)
+      writeCurrentUser(null)
     }
   }
   const value = { isAuthenticated, loading, initializing, login, logout, currentUser }

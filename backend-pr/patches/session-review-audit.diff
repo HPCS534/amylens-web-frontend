@@ -1,0 +1,63 @@
+*** Begin Patch
+*** Add File: src/main/java/com/example/amylens/domain/SessionReviewAuditPatch.md
++This patch shows the recommended Java changes. Adjust package names and types to match the backend project.
++
++1) Entity: add columns to the `Session` or `SessionReview` entity.
++
++Example (Session.java):
++
++@@
++    // existing fields
++    private String reviewerIdentity;
++    private Instant reviewerTimestamp;
++    private String reviewerNote;
++
++    // getters / setters
++
++
++2) DTOs: extend the review request DTO to include reviewerIdentity and reviewerTimestamp (server will set authoritative timestamp).
++
++Example (SessionReviewRequest.java):
++
++@@
++public class SessionReviewRequest {
++    private String action; // "approve" | "reject"
++    private String reviewerNote;
++    private String reviewerIdentity; // optional, client-reported
++    private Instant reviewerTimestamp; // optional, client-reported
++
++    // getters/setters
++}
++
++3) Controller: when handling POST /api/sessions/{id}/review, populate entity fields and save.
++
++Example (SessionController.java or SessionReviewController.java):
++
++@@
++    @PostMapping("/api/sessions/{id}/review")
++    public ResponseEntity<?> reviewSession(@PathVariable UUID id, @RequestBody SessionReviewRequest req, Principal principal) {
++        Session session = sessionService.findById(id);
++        if (session == null) return ResponseEntity.notFound().build();
++
++        // apply action (approve/reject) per existing logic
++        session.applyReviewAction(req.getAction());
++
++        // audit fields: prefer server-side principal, but accept client field as auxiliary info
++        String reviewer = Optional.ofNullable(req.getReviewerIdentity()).orElseGet(() -> principal != null ? principal.getName() : null);
++        session.setReviewerIdentity(reviewer);
++
++        Instant ts = Optional.ofNullable(req.getReviewerTimestamp()).orElse(Instant.now());
++        session.setReviewerTimestamp(ts);
++
++        session.setReviewerNote(req.getReviewerNote());
++
++        sessionService.save(session);
++
++        return ResponseEntity.ok().build();
++    }
++
++4) Repository: ensure `SessionRepository` maps the new fields or uses JPA auto-mapping.
++
++5) Tests: add an integration test that POSTs review, then GETs session to verify `reviewerIdentity` and `reviewerTimestamp` persisted.
++
+*** End Patch

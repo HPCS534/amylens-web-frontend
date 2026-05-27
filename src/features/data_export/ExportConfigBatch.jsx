@@ -1,5 +1,4 @@
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
 
 export default function ExportConfig(props) {
   const {
@@ -8,6 +7,8 @@ export default function ExportConfig(props) {
     exportTypes,
     format,
     setFormat,
+    status,
+    setStatus,
     dateFrom,
     setDateFrom,
     dateTo,
@@ -17,11 +18,12 @@ export default function ExportConfig(props) {
     download,
   } = props
 
-  const navigate = useNavigate()
-
   return (
     <div className="module-grid export-page export-page--config">
-      <div className="export-breadcrumb"><button type="button" className="ghost-button" onClick={() => navigate(-1)} style={{ marginRight: '0.5rem' }}>←</button>REPORTS &gt; EXPORTS</div>
+      <div className="export-breadcrumb">
+        <button type="button" className="ghost-button" onClick={() => setViewMode('landing')} style={{ marginRight: '0.5rem' }}>←</button>
+        DATA EXPORT &gt; BATCH EXPORT CONFIGURATION
+      </div>
       <section className="section-card" style={{ gridColumn: '1 / 2' }}>
         <div className="card-title">Configure Batch Export</div>
         <p className="help-note">Define the parameters for your institutional data aggregate. Processing occurs in a secure isolated environment.</p>
@@ -50,19 +52,32 @@ export default function ExportConfig(props) {
             </div>
           </div>
 
-          <div style={{ marginTop: '1rem' }}>
-            <div className="card export-criteria-card" style={{ padding: '1rem' }}>
-              <div className="card-title">Record Selection Criteria</div>
-              <div style={{ marginTop: '0.75rem', display: 'grid', gap: '0.75rem' }}>
-                <label><input type="radio" name="criteria" defaultChecked /> All Reconciled Sessions</label>
-                <label><input type="radio" name="criteria" /> Flagged Sessions Only</label>
-              </div>
+          <div style={{ marginTop: '1rem', display: 'grid', gap: '1rem', gridTemplateColumns: '1fr 1fr' }}>
+            <div>
+              <label htmlFor="status">Session Status</label>
+              <select id="status" value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="verified">Verified</option>
+                <option value="needs_review">Needs Review</option>
+                <option value="all">All</option>
+              </select>
             </div>
+            <div>
+              <label htmlFor="variety">Variety</label>
+              <select id="variety" value={variety} onChange={(e) => setVariety(e.target.value)}>
+                <option value="all">All</option>
+                <option value="IR64">IR64</option>
+                <option value="IRRI-9">IRRI-9</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '1rem' }}>
+            <p className="help-note">Batch exports apply the selected filters and return a single standardized file.</p>
           </div>
 
           <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'space-between' }}>
             <button className="ghost-button" type="button" onClick={() => setViewMode('landing')}>Cancel</button>
-            <button className="outline-button" type="button" onClick={async () => { await download(); setViewMode('processing') }}>Start Processing</button>
+            <button className="outline-button" type="button" onClick={async () => { await download(); setViewMode('processing') }}>Generate Export</button>
           </div>
         </div>
       </section>

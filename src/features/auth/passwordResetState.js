@@ -1,35 +1,25 @@
-const PASSWORD_RESET_FLAG = 'amylens.passwordResetCompleted'
-const DEV_PASSWORD_KEY = 'amylens.devPassword'
-const DEFAULT_DEV_PASSWORD = 'test'
+const PASSWORD_RESET_REQUIRED_KEY = 'amylens.passwordResetRequired'
 
-export function hasCompletedPasswordReset() {
+export function isPasswordResetRequired() {
   try {
-    return window.localStorage.getItem(PASSWORD_RESET_FLAG) === 'true'
+    return window.sessionStorage.getItem(PASSWORD_RESET_REQUIRED_KEY) === 'true'
   } catch {
     return false
   }
 }
 
-export function markPasswordResetCompleted() {
+export function markPasswordResetRequired() {
   try {
-    window.localStorage.setItem(PASSWORD_RESET_FLAG, 'true')
+    window.sessionStorage.setItem(PASSWORD_RESET_REQUIRED_KEY, 'true')
   } catch {
-    // Ignore storage failures; the backend reset already succeeded.
+    // Ignore session storage failures; the backend session remains authoritative.
   }
 }
 
-export function getDevPassword() {
+export function clearPasswordResetRequired() {
   try {
-    return window.localStorage.getItem(DEV_PASSWORD_KEY) || DEFAULT_DEV_PASSWORD
+    window.sessionStorage.removeItem(PASSWORD_RESET_REQUIRED_KEY)
   } catch {
-    return DEFAULT_DEV_PASSWORD
-  }
-}
-
-export function setDevPassword(password) {
-  try {
-    window.localStorage.setItem(DEV_PASSWORD_KEY, password)
-  } catch {
-    // Ignore storage failures; the session can still continue in-memory.
+    // Ignore session storage failures; the backend session remains authoritative.
   }
 }

@@ -1,5 +1,6 @@
-// Lightweight API client for interacting with Module 3 backend
-const base = import.meta.env.DEV ? '' : import.meta.env.VITE_API_URL ?? ''
+// Lightweight API client for interacting with the Module 4 backend surface
+// In development, default to the locally-running backend so the UI can call APIs across origins.
+const base = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8080' : '')
 
 function buildUrl(path) {
   if (!path.startsWith('/')) path = '/' + path
@@ -53,7 +54,7 @@ async function requestBlob(path, options = {}) {
 }
 
 export async function login(username, password) {
-  // Backend uses form login at /api/auth/login (Spring Security)
+  // Backend uses Spring Security form login at /api/auth/login.
   const body = new URLSearchParams({ username, password })
   const res = await fetch(buildUrl('/api/auth/login'), {
     method: 'POST',
@@ -66,13 +67,17 @@ export async function login(username, password) {
 }
 
 export const api = {
-  // Public endpoints
-  getVarieties: () => request('/api/varieties'),
-  submitSession: (dto) => request('/api/sessions', { method: 'POST', body: dto }),
-  deviceAuth: (ssaid) => request('/api/devices/auth', { method: 'POST', body: { ssaid } }),
-  getDeviceUsers: (ssaid) => request(`/api/devices/${encodeURIComponent(ssaid)}/users`),
   resetPassword: (currentPassword, newPassword) =>
     request('/api/auth/reset', { method: 'POST', body: { currentPassword, newPassword } }),
+
+  importGqrisMirror: (file) => {
+    const formData = new FormData()
+    formData.append('file', file, file.name)
+    return request('/api/admin/gqris/import', {
+      method: 'POST',
+      body: formData,
+    })
+  },
 
   // Authenticated/dashboard endpoints (require login via `login()`)
   getSessions: ({ variety, status, dateFrom, dateTo } = {}) => {
@@ -85,38 +90,19 @@ export const api = {
     return request(`/api/sessions${qs ? `?${qs}` : ''}`)
   },
 
-  reviewSession: (id, { action, reviewerNote, reviewerIdentity } = {}) =>
-    request(`/api/sessions/${id}/review`, { method: 'POST', body: { action, reviewerNote, reviewerIdentity } }),
+  reviewSession: (id, { action, reviewerNote, reviewerIdentity, reviewTimestamp } = {}) =>
+    request(`/api/sessions/${id}/review`, {
+      method: 'POST',
+      body: {
+        action,
+        reviewerNote,
+        reviewerIdentity,
+        reviewTimestamp: reviewTimestamp ?? new Date().toISOString(),
+      },
+    }),
 
   getAnalytics: () => request('/api/analytics'),
   exportSessions: ({ format = 'csv', variety, status, dateFrom, dateTo } = {}) => {
-    // DEV fallback: return hardcoded blobs when running locally without a backend
-    if (import.meta.env.DEV) {
-      const sampleRows = [
-        ['sessionId', 'deviceSsaid', 'userName', 'variety', 'amyloseClass', 'confidenceScore', 'capturedAt', 'submittedAt', 'trialStage', 'season', 'imageHash', 'grainLength', 'grainShape', 'percentAcceptability'],
-        ['SESS-001', '550e8400-e29b-41d4-a716-446655440000', 'Alice', 'IR64', 'Waxy', '0.92', '2024-10-01T09:12:00Z', '2024-10-01T09:13:00Z', 'Field', '2024', 'hash1', '6.2', 'Long', '98.5'],
-        ['SESS-002', '76c45922-a11c-9a3d-a223-228833119999', 'Bob', 'Samba', 'Low', '0.78', '2024-10-02T11:05:00Z', '2024-10-02T11:06:00Z', 'Lab', '2024', 'hash2', '5.9', 'Round', '92.1'],
-      ]
-
-      if (format === 'json') {
-        const json = JSON.stringify([
-          { sessionId: 'SESS-001', deviceSsaid: '550e8...', userName: 'Alice', variety: 'IR64', amyloseClass: 'Waxy', confidenceScore: 0.92, capturedAt: '2024-10-01T09:12:00Z' },
-          { sessionId: 'SESS-002', deviceSsaid: '76c45...', userName: 'Bob', variety: 'Samba', amyloseClass: 'Low', confidenceScore: 0.78, capturedAt: '2024-10-02T11:05:00Z' },
-        ], null, 2)
-        return Promise.resolve(new Blob([json], { type: 'application/json' }))
-      }
-
-      // For CSV/PDF fallback: return CSV content; PDF will be a text blob (for simple testing)
-      const csv = sampleRows.map((r) => r.map((c) => String(c).replace(/"/g, '""')).map((c) => `"${c}"
-      `.trim()).join(',')).join('\n')
-      if (format === 'pdf') {
-        // Not a real PDF generator; return a basic PDF-like blob placeholder for testing download
-        const pdfContent = '%PDF-1.4\n%âãÏÓ\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n'
-        return Promise.resolve(new Blob([pdfContent], { type: 'application/pdf' }))
-      }
-      return Promise.resolve(new Blob([csv], { type: 'text/csv' }))
-    }
-
     const params = new URLSearchParams({ format })
     if (variety) params.set('variety', variety)
     if (status) params.set('status', status)

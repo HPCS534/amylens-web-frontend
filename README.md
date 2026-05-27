@@ -86,7 +86,13 @@ If phone scan opens `localhost` or cannot connect:
 4. Allow firewall inbound traffic for frontend port (`5173`) and backend port (`8080`).
 5. Hard refresh the web app and rescan the QR.
 
+## Offline GQ-RIS Import Queue
+
+- The Device Management UI supports importing historical GQ-RIS CSV mirrors. If an import fails due to network or server errors, the file is saved into a small IndexedDB queue and retried automatically when the browser regains connectivity.
+- Queued imports are stored locally in the `amylens-offline` database under the `gqris-imports` store. You can clear them by clearing application site data in your browser.
+
 ## Backend Integration
 
 - Frontend API calls use `/api/*` and Vite proxies them to `VITE_API_URL` in development.
-- If backend authentication redirects or CORS issues occur, verify backend CORS/session-cookie settings for your frontend origin.
+- API failures should now return `401/403` instead of a login HTML redirect.
+- If you run the frontend on another origin, verify backend CORS allowlists and session-cookie settings (`SameSite`/`Secure`) match that origin.

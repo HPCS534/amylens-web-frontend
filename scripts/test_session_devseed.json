@@ -1,0 +1,12 @@
+{
+  "deviceSsaid": "dev-seed-001",
+  "userName": "Researcher A",
+  "variety": "IR64",
+  "amyloseClass": "High",
+  "confidenceScore": 0.95,
+  "capturedAt": "2026-05-20T08:00:00.000Z",
+  "submittedAt": "2026-05-20T08:01:00.000Z",
+  "trialStage": "OYT",
+  "season": "Dry",
+  "imageHash": "hash-1"
+}

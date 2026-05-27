@@ -18,12 +18,12 @@ describe('DeviceManagementPage', () => {
       />,
     )
 
-    expect(screen.queryByRole('dialog', { name: 'Device Configuration Modal' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Device Configuration Modal' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Manage Tablet-X' }))
-    expect(screen.getByRole('dialog', { name: 'Device Configuration Modal' })).toBeInTheDocument()
+    expect(screen.getByText('Manage assignment and health routing for this device.')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
-    expect(screen.queryByRole('dialog', { name: 'Device Configuration Modal' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Device Configuration Modal' })).toBeNull()
   })
 })

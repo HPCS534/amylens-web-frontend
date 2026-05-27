@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthProvider'
-import { hasCompletedPasswordReset } from './passwordResetState'
+import { markPasswordResetRequired } from './passwordResetState'
 import './LoginPage.css'
 
 function LoginPage() {
@@ -14,11 +14,13 @@ function LoginPage() {
     e.preventDefault()
     try {
       await login(username, password)
-      if (!hasCompletedPasswordReset()) {
-        navigate('/reset-password', { replace: true })
-      } else {
-        navigate('/app/devices', { replace: true })
+      if (username === 'admin' && password === 'test') {
+        markPasswordResetRequired()
+        navigate('/reset-password', { replace: true, state: { currentPassword: password } })
+        return
       }
+
+      navigate('/app/devices', { replace: true })
     } catch (err) {
       alert('Login failed: ' + (err.message || err))
     }
@@ -29,7 +31,7 @@ function LoginPage() {
       <div className="auth-card">
         <div className="auth-icon">🔒</div>
         <h2 className="auth-title">Team Lead Dashboard</h2>
-        <p className="auth-sub">Sign in to manage devices, sessions, and analytics.</p>
+        <p className="auth-sub">Sign in to manage devices, sessions, analytics, and exports.</p>
 
         <form onSubmit={submit} className="login-form" aria-label="Team Lead Login Form">
           <label htmlFor="username">USERNAME</label>

@@ -9,7 +9,6 @@ import ExportConfigBatch from './ExportConfigBatch'
 const exportTypes = [
   { key: 'csv', title: 'CSV', description: '14-column GQ-RIS schema' },
   { key: 'json', title: 'JSON', description: 'Structured payload for integrations' },
-  { key: 'pdf', title: 'PDF', description: 'One-session printable report' },
 ]
 
 const exportTypesBatch = [
@@ -58,20 +57,14 @@ export default function ExportPage() {
     setViewMode('config')
   }
 
-  const openBatchConfig = () => {
-    setFormat('csv')
-    setViewMode('configBatch')
-  }
-
   const summaryCard = (
     <div className="card export-summary-panel" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
-      <div className="card-title">EXPORT SUMMARY</div>
-      <div className="export-big-number" style={{ fontWeight: 700, marginTop: '0.5rem' }}>1,284</div>
-      <div style={{ marginTop: '1rem', display: 'grid', gap: '0.75rem' }}>
-        <div>Estimated Size <strong style={{ float: 'right' }}>14.2 MB</strong></div>
-        <div>Privacy Compliance <strong style={{ float: 'right' }}>AES-256</strong></div>
-        <div>Estimated Time <strong style={{ float: 'right' }}>~45 seconds</strong></div>
-        <div>Schema <strong style={{ float: 'right' }}>14-col GQ-RIS</strong></div>
+      <div className="card-title">EXPORT CONTROL</div>
+      <p className="help-note" style={{ marginTop: '0.5rem' }}>Use the controls to export filtered session records through the standard 14-column GQ-RIS schema.</p>
+      <div style={{ marginTop: '1rem', display: 'grid', gap: '0.5rem' }}>
+        <div>Format <strong style={{ float: 'right' }}>{format.toUpperCase()}</strong></div>
+        <div>Status <strong style={{ float: 'right' }}>{status === 'all' ? 'All' : status.replace('_', ' ').toUpperCase()}</strong></div>
+        <div>Variety <strong style={{ float: 'right' }}>{variety === 'all' ? 'All' : variety}</strong></div>
       </div>
     </div>
   )
@@ -80,7 +73,8 @@ export default function ExportPage() {
     <ExportProcessing
       setViewMode={setViewMode}
       summaryCard={summaryCard}
-      openConfigForFormat={openConfigForFormat}
+      loading={loading}
+      message={message}
     />
   )
   if (viewMode === 'configBatch') return (
@@ -90,6 +84,8 @@ export default function ExportPage() {
       exportTypes={exportTypesBatch}
       format={format}
       setFormat={setFormat}
+      status={status}
+      setStatus={setStatus}
       dateFrom={dateFrom}
       setDateFrom={setDateFrom}
       dateTo={dateTo}
@@ -107,6 +103,8 @@ export default function ExportPage() {
       exportTypes={exportTypes}
       format={format}
       setFormat={setFormat}
+      status={status}
+      setStatus={setStatus}
       dateFrom={dateFrom}
       setDateFrom={setDateFrom}
       dateTo={dateTo}
