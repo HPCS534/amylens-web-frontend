@@ -1,9 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import FlaggedSessionsPage from './FlaggedSessionsPage'
 
 describe('FlaggedSessionsPage', () => {
-  it('renders the approve/reject modal actions and requires a note for reject', () => {
+  it('renders the approve/reject modal actions and requires a note for reject', async () => {
     const onSubmitReview = vi.fn()
 
     render(
@@ -13,20 +13,34 @@ describe('FlaggedSessionsPage', () => {
       />,
     )
 
-    expect(screen.getByText('92.5%')).toBeInTheDocument()
+    expect(screen.getByText('92.5%')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Review AS-0100' }))
 
     const approveButton = screen.getByRole('button', { name: 'Approve (Clear Flag)' })
     const rejectButton = screen.getByRole('button', { name: 'Reject Session' })
 
-    expect(rejectButton).toBeEnabled()
+    expect(rejectButton.disabled).toBe(false)
 
     fireEvent.click(rejectButton)
-    expect(screen.getByText('Review notes are required before rejecting a session.')).toBeInTheDocument()
+    expect(screen.getByText('Review notes are required before rejecting a session.')).toBeTruthy()
     expect(onSubmitReview).not.toHaveBeenCalled()
 
     fireEvent.click(approveButton)
-    expect(onSubmitReview).toHaveBeenCalledWith({ sessionId: 'AS-0100', action: 'approve', reason: '' })
+
+    await waitFor(() => {
+      expect(onSubmitReview).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: 'AS-0100',
+          action: 'approve',
+          reviewerIdentity: 'unknown',
+          reviewerNote: '',
+        }),
+      )
+    })
+
+    expect(screen.getByText('Session Approved Successfully')).toBeTruthy()
+    expect(screen.getByText(/Reviewer:/)).toBeTruthy()
+    expect(screen.getByText(/Timestamp:/)).toBeTruthy()
   })
 })

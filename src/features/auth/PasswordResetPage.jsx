@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
-import { getDevPassword, markPasswordResetCompleted, setDevPassword } from './passwordResetState'
+import { clearPasswordResetRequired } from './passwordResetState'
 import './LoginPage.css'
 import './PasswordResetPage.css'
 
 export default function PasswordResetPage() {
   const navigate = useNavigate()
-  const isDev = import.meta.env.DEV
-  const [currentPassword, setCurrentPassword] = useState('test')
+  const location = useLocation()
+  const [currentPassword, setCurrentPassword] = useState(location.state?.currentPassword ?? '')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -25,21 +25,9 @@ export default function PasswordResetPage() {
 
     setLoading(true)
     try {
-      try {
-        await api.resetPassword(currentPassword, newPassword)
-      } catch (error) {
-        if (!import.meta.env.DEV) {
-          throw error
-        }
-
-        if (currentPassword !== getDevPassword()) {
-          throw new Error('Current password is incorrect.')
-        }
-      }
-
-      setDevPassword(newPassword)
-      markPasswordResetCompleted()
-      navigate('/login', { replace: true })
+      await api.resetPassword(currentPassword, newPassword)
+      clearPasswordResetRequired()
+      navigate('/app/devices', { replace: true })
     } catch (err) {
       setError(err.body || err.message || 'Password reset failed.')
     } finally {

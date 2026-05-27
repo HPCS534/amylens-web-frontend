@@ -2,7 +2,14 @@ function formatMetricConfidence(metricConfidence) {
   return `${(metricConfidence * 100).toFixed(1)}%`
 }
 
-function ReviewModal({ analysisSession, reasonComment, onReasonCommentChange, onClose, onApprove, onReject, noteError }) {
+function formatReviewTimestamp(timestamp) {
+  if (!timestamp) return 'Pending'
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return String(timestamp)
+  return date.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC')
+}
+
+function ReviewModal({ analysisSession, reasonComment, onReasonCommentChange, onClose, onApprove, onReject, noteError, reviewerIdentity }) {
 
   return (
     <div className="modal-backdrop review-backdrop">
@@ -34,6 +41,17 @@ function ReviewModal({ analysisSession, reasonComment, onReasonCommentChange, on
             <div>
               <div className="review-label">FLAG REASON</div>
               <div className="review-value review-reason">{analysisSession.flagReason ?? 'Manual Flag: Validation Required'}</div>
+            </div>
+          </div>
+
+          <div className="review-detail-card" style={{ marginTop: '1rem' }}>
+            <div>
+              <div className="review-label">REVIEWER</div>
+              <div className="review-value">{reviewerIdentity ?? analysisSession.reviewerIdentity ?? 'Pending assignment'}</div>
+            </div>
+            <div>
+              <div className="review-label">REVIEW TIMESTAMP</div>
+              <div className="review-value">{formatReviewTimestamp(analysisSession.reviewTimestamp ?? analysisSession.__raw?.reviewedAt)}</div>
             </div>
           </div>
 
@@ -79,7 +97,7 @@ function ReviewModal({ analysisSession, reasonComment, onReasonCommentChange, on
   )
 }
 
-function ReviewSuccessModal({ action, onDismissAndRefresh }) {
+function ReviewSuccessModal({ action, reviewerIdentity, reviewTimestamp, reviewerNote, onDismissAndRefresh }) {
   const isApprove = action === 'approve'
 
   return (
@@ -95,6 +113,11 @@ function ReviewSuccessModal({ action, onDismissAndRefresh }) {
           {isApprove
             ? 'The session flag has been resolved and the data has been verified for institutional reporting.'
             : 'The session flag has been resolved and the data has been invalidated for security purposes.'}
+        </div>
+        <div style={{ marginTop: '0.75rem', display: 'grid', gap: '0.35rem', fontSize: '0.9rem', color: '#374151' }}>
+          <div><strong>Reviewer:</strong> {reviewerIdentity ?? 'Unknown'}</div>
+          <div><strong>Timestamp:</strong> {formatReviewTimestamp(reviewTimestamp)}</div>
+          {reviewerNote ? <div><strong>Note:</strong> {reviewerNote}</div> : null}
         </div>
         <button className="primary-button review-success-button" type="button" onClick={onDismissAndRefresh}>
           Dismiss and Refresh

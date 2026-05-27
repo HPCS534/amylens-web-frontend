@@ -1,47 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { api } from '../../api/client'
-
-const defaultDeviceRegistrations = [
-  {
-    id: '550e8400-e29b-41d4-a716-446655440000',
-    ssaid: '550e8400-e29b-41d4-a716-446655440000',
-    status: 'pending',
-    dateAdded: '2023-10-24T09:42:00Z',
-    healthStatus: 'Healthy',
-  },
-  {
-    id: '76c45922-a11c-9a3d-a223-228833119999',
-    ssaid: '76c45922-a11c-9a3d-a223-228833119999',
-    status: 'pending',
-    dateAdded: '2023-10-23T16:15:00Z',
-    healthStatus: 'Healthy',
-  },
-  {
-    id: 'ad9871a6-c992-0041-f222-111122223333',
-    ssaid: 'ad9871a6-c992-0041-f222-111122223333',
-    status: 'verifying',
-    dateAdded: '2023-10-23T11:02:00Z',
-    healthStatus: 'Warning',
-  },
-  {
-    id: '3312e844-41d4-a716-4466-990011223344',
-    ssaid: '3312e844-41d4-a716-4466-990011223344',
-    status: 'pending',
-    dateAdded: '2023-10-22T14:50:00Z',
-    healthStatus: 'Healthy',
-  },
-]
+import GqrisImportTrigger from './GqrisImportTrigger'
 
 function normalizeDevices(payload) {
   let devices = null
   if (Array.isArray(payload)) devices = payload
   else if (Array.isArray(payload?.devices)) devices = payload.devices
   else if (Array.isArray(payload?.content)) devices = payload.content
-  else return defaultDeviceRegistrations
+  else return []
   
-  // Fallback to hardcoded data if API returns empty
-  return devices.length > 0 ? devices : defaultDeviceRegistrations
+  return devices
 }
 
 function statusClass(status) {
@@ -51,25 +20,18 @@ function statusClass(status) {
   return 'pending'
 }
 
-function DeviceManagementPage({ deviceRegistrations = defaultDeviceRegistrations }) {
+function DeviceManagementPage({ deviceRegistrations = [] }) {
   const [registrations, setRegistrations] = useState(deviceRegistrations)
   const [selectedRegistration, setSelectedRegistration] = useState(null)
   const [copied, setCopied] = useState(false)
 
   const qrValue = useMemo(() => {
-    // Allow explicit override for real device provisioning links.
     if (import.meta.env.VITE_QR_URL) return import.meta.env.VITE_QR_URL
-
-    // Default to the current frontend host so phones on the same LAN can open it.
-    if (typeof window !== 'undefined' && window.location?.origin) {
-      const host = window.location.hostname
-      const lanHost = import.meta.env.VITE_LAN_HOST
-      const resolvedHost = host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' ? (lanHost || host) : host
-      const port = window.location.port ? `:${window.location.port}` : ''
-      return `${window.location.protocol}//${resolvedHost}${port}/login`
+    if (typeof window !== 'undefined' && window.location?.hostname) {
+      return `https://${window.location.hostname}:443`
     }
 
-    return import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api'
+    return 'https://<server-ip>:443'
   }, [])
 
   useEffect(() => {
@@ -184,11 +146,11 @@ function DeviceManagementPage({ deviceRegistrations = defaultDeviceRegistrations
         <div className="section-head">
           <div>
             <h2 className="section-title">Device Management Roster</h2>
-            <div className="section-subtitle">Authorization queue for new hardware nodes.</div>
+            <div className="section-subtitle">Authorize approved devices and manage team access for the dashboard.</div>
           </div>
           <div className="pill-row">
             <button className="ghost-button" type="button">Filter</button>
-            <button className="ghost-button" type="button">Export CSV</button>
+            <GqrisImportTrigger />
           </div>
         </div>
 
@@ -203,37 +165,45 @@ function DeviceManagementPage({ deviceRegistrations = defaultDeviceRegistrations
               </tr>
             </thead>
             <tbody>
-              {registrations.map((registration) => (
-                <tr key={registration.id}>
-                  <td>{registration.ssaid ?? registration.id}</td>
-                  <td>{new Date(registration.dateAdded ?? registration.lastSeenAt ?? Date.now()).toLocaleString('en-US', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-                  <td>
-                    <span className={`status-tag ${statusClass(registration.status)}`}>
-                      <span>●</span>
-                      <span>{String(registration.status ?? 'pending').toUpperCase()}</span>
-                    </span>
-                  </td>
-                  <td>
-                    <div className="table-actions">
-                      <button className="ghost-button sr-only" aria-label={`Manage ${registration.hardwareIdentity ?? registration.ssaid ?? registration.id}`} type="button" onClick={() => setSelectedRegistration(registration)}>
-                        Manage
-                      </button>
-                      <button className="outline-button" type="button" onClick={() => updateDevice(registration, 'approve')} aria-label={`Approve ${registration.ssaid ?? registration.id}`}>
-                        ✓
-                      </button>
-                      <button className="primary-button" type="button" onClick={() => updateDevice(registration, 'deny')} aria-label={`Deny ${registration.ssaid ?? registration.id}`}>
-                        ✕
-                      </button>
-                    </div>
+              {registrations.length > 0 ? (
+                registrations.map((registration) => (
+                  <tr key={registration.id}>
+                    <td>{registration.ssaid ?? registration.id}</td>
+                    <td>{new Date(registration.registeredAt ?? registration.dateAdded ?? registration.lastSeenAt ?? Date.now()).toLocaleString('en-US', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td>
+                      <span className={`status-tag ${statusClass((registration.status ?? '').toLowerCase())}`}>
+                        <span>●</span>
+                        <span>{String(registration.status ?? 'PENDING').toUpperCase()}</span>
+                      </span>
+                    </td>
+                    <td>
+                      <div className="table-actions">
+                        <button className="ghost-button sr-only" aria-label={`Manage ${registration.hardwareIdentity ?? registration.ssaid ?? registration.id}`} type="button" onClick={() => setSelectedRegistration(registration)}>
+                          Manage
+                        </button>
+                        <button className="outline-button" type="button" onClick={() => updateDevice(registration, 'approve')} aria-label={`Approve ${registration.ssaid ?? registration.id}`}>
+                          ✓
+                        </button>
+                        <button className="primary-button" type="button" onClick={() => updateDevice(registration, 'deny')} aria-label={`Deny ${registration.ssaid ?? registration.id}`}>
+                          ✕
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>
+                    No devices registered yet.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
 
         <div className="meta-footer">
-          <div>Showing {Math.min(4, registrations.length)} of {registrations.length} pending requests</div>
+          <div>Showing {registrations.length} registered devices</div>
           <div className="pagination" aria-label="Device roster pagination">
             <button type="button">‹</button>
             <button type="button" className="active">1</button>

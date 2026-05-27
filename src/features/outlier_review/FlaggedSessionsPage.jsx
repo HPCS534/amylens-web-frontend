@@ -3,28 +3,54 @@ import { api } from '../../api/client'
 import { useAuth } from '../auth/AuthProvider'
 import ReviewModal, { ReviewSuccessModal } from './ReviewModal'
 
-const defaultFlaggedSessions = [
-  { sessionId: 'SESS-892', metricConfidence: 0.984, status: 'needs_review', flagReason: 'Anomalous Color Profile Detection', technician: 'John Doe' },
-  { sessionId: 'SESS-741', metricConfidence: 0.892, status: 'needs_review', flagReason: 'Unexpected Packet Latency Spikes', technician: 'Anna Smith' },
-  { sessionId: 'SESS-103', metricConfidence: 0.621, status: 'needs_review', flagReason: 'Manual Flag: Validation Required', technician: 'Mike Kelvin' },
-]
-
-function normalizeSessions(payload, fallback = defaultFlaggedSessions) {
+function normalizeSessions(payload) {
   let sessions = null
   if (Array.isArray(payload)) sessions = payload
   else if (Array.isArray(payload?.content)) sessions = payload.content
   else if (Array.isArray(payload?.sessions)) sessions = payload.sessions
-  else return fallback
-  
-  // Fallback to hardcoded data if API returns empty
-  return sessions.length > 0 ? sessions : fallback
+  else return []
+
+  if (!Array.isArray(sessions)) return []
+
+  // Normalize various backend shapes to the UI's expected fields
+  return sessions.map((s) => {
+    const metricConfidence = typeof s.metricConfidence === 'number'
+      ? s.metricConfidence
+      : typeof s.confidenceScore === 'number'
+        ? s.confidenceScore
+        : typeof s.confidence === 'number'
+          ? s.confidence
+          : undefined
+
+    return {
+      // UI expects `sessionId`; backend may return `id`.
+      sessionId: s.sessionId ?? s.id ?? s.imageHash ?? null,
+      metricConfidence: metricConfidence ?? 0,
+      flagReason: s.flagReason ?? s.verdictReason ?? (s.needsReview ? 'Manual Flag: Validation Required' : s.verdict ?? null),
+      technician: s.technician ?? s.userName ?? s.user ?? null,
+      reviewerIdentity: s.reviewerIdentity ?? s.reviewedBy ?? s.reviewedByUsername ?? null,
+      reviewTimestamp: s.reviewTimestamp ?? s.reviewedAt ?? s.reviewed_at ?? null,
+      reviewerNote: s.reviewerNote ?? s.reviewNote ?? s.review_reason ?? null,
+      // keep original payload for modal/details
+      __raw: s,
+    }
+  })
+}
+
+function formatReviewTimestamp(timestamp) {
+  if (!timestamp) return 'Pending'
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return String(timestamp)
+  return date.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC')
 }
 
 function formatMetricConfidence(metricConfidence) {
-  return `${(metricConfidence * 100).toFixed(1)}%`
+  const value = Number(metricConfidence)
+  if (!Number.isFinite(value)) return '—'
+  return `${(value * 100).toFixed(1)}%`
 }
 
-function FlaggedSessionsPage({ sessions = defaultFlaggedSessions, onSubmitReview = () => {} }) {
+function FlaggedSessionsPage({ sessions = [], onSubmitReview = () => {} }) {
   const [records, setRecords] = useState(sessions)
   const [selectedSession, setSelectedSession] = useState(null)
   const [reasonComment, setReasonComment] = useState('')
@@ -37,7 +63,7 @@ function FlaggedSessionsPage({ sessions = defaultFlaggedSessions, onSubmitReview
       .getSessions({ status: 'needs_review' })
       .then((payload) => {
         if (!active) return
-        setRecords(normalizeSessions(payload, sessions))
+        setRecords(normalizeSessions(payload))
       })
       .catch(() => {
         if (active) setRecords(sessions)
@@ -64,7 +90,7 @@ function FlaggedSessionsPage({ sessions = defaultFlaggedSessions, onSubmitReview
   const refreshSessions = async () => {
     try {
       const payload = await api.getSessions({ status: 'needs_review' })
-      setRecords(normalizeSessions(payload, sessions))
+      setRecords(normalizeSessions(payload))
     } catch (error) {
       if (!import.meta.env.DEV) throw error
     }
@@ -77,20 +103,24 @@ function FlaggedSessionsPage({ sessions = defaultFlaggedSessions, onSubmitReview
     }
 
     setNoteError('')
+    const reviewerIdentity = currentUser?.username ?? 'unknown'
+    const reviewTimestamp = new Date().toISOString()
+    const reviewerNote = reason.trim()
 
     try {
       await api.reviewSession(sessionId, {
         action,
-        reviewerNote: reason.trim() || undefined,
-        reviewerIdentity: currentUser?.username,
+        reviewerNote: reviewerNote || undefined,
+        reviewerIdentity,
+        reviewTimestamp,
       })
     } catch (error) {
       if (!import.meta.env.DEV) throw error
     }
 
-    onSubmitReview({ sessionId, action, reason })
+    onSubmitReview({ sessionId, action, reviewerIdentity, reviewTimestamp, reviewerNote })
     setRecords((current) => current.filter((record) => record.sessionId !== sessionId))
-    setReviewOutcome({ sessionId, action })
+    setReviewOutcome({ sessionId, action, reviewerIdentity, reviewTimestamp, reviewerNote })
     closeReview()
   }
 
@@ -149,6 +179,13 @@ function FlaggedSessionsPage({ sessions = defaultFlaggedSessions, onSubmitReview
                   </td>
                   <td>
                     <span className="badge badge-healthy">{(analysisSession.technician ?? 'JD').slice(0, 2).toUpperCase()}</span> {analysisSession.technician ?? 'John Doe'}
+                    {(analysisSession.reviewerIdentity || analysisSession.reviewTimestamp) && (
+                      <div style={{ marginTop: '0.25rem', fontSize: '0.78rem', color: '#6b7280' }}>
+                        Reviewed by <strong>{analysisSession.reviewerIdentity ?? 'Unknown'}</strong>
+                        {' '}
+                        · {formatReviewTimestamp(analysisSession.reviewTimestamp)}
+                      </div>
+                    )}
                   </td>
                   <td>
                     <button
@@ -184,13 +221,20 @@ function FlaggedSessionsPage({ sessions = defaultFlaggedSessions, onSubmitReview
           onReasonCommentChange={setReasonComment}
           onClose={closeReview}
           noteError={noteError}
+          reviewerIdentity={currentUser?.username}
           onApprove={(sessionId) => reviewSession(sessionId, 'approve')}
           onReject={(sessionId, reason) => reviewSession(sessionId, 'reject', reason)}
         />
       )}
 
       {reviewOutcome && (
-        <ReviewSuccessModal action={reviewOutcome.action} onDismissAndRefresh={dismissAndRefresh} />
+        <ReviewSuccessModal
+          action={reviewOutcome.action}
+          reviewerIdentity={reviewOutcome.reviewerIdentity}
+          reviewTimestamp={reviewOutcome.reviewTimestamp}
+          reviewerNote={reviewOutcome.reviewerNote}
+          onDismissAndRefresh={dismissAndRefresh}
+        />
       )}
     </div>
   )
