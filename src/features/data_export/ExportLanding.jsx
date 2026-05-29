@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
+import { EXPORT_UI } from '../../config/entities'
 
 export default function ExportLanding({ setViewMode, summaryCard }) {
   const [sessions, setSessions] = useState([])
@@ -25,7 +26,7 @@ export default function ExportLanding({ setViewMode, summaryCard }) {
             <div className="card-title" style={{ color: '#ffffff' }}>SYSTEM LEVEL BATCH</div>
             <h2 style={{ marginTop: '0.5rem', color: '#ffffff' }}>Batch Data Export</h2>
             <p style={{ color: '#ffffff', marginTop: '0.75rem' }}>
-              Generate a comprehensive dataset utilizing the 17-column GQ-RIS schema. This export includes all reconciled
+              Generate a comprehensive dataset utilizing the {EXPORT_UI.schemaLabel} schema. This export includes all reconciled
               device telemetry, session identifiers, and proprietary analytics metadata.
             </p>
             <button className="outline-button" type="button" style={{ marginTop: '1rem' }} onClick={() => setViewMode('processing')}>
@@ -61,7 +62,7 @@ export default function ExportLanding({ setViewMode, summaryCard }) {
                       <td><strong style={{ color: '#2149b7' }}>{s.id}</strong></td>
                       <td>{s.variety ?? '—'}</td>
                       <td>{s.submittedAt ? new Date(s.submittedAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '—'}</td>
-                      <td>JSON • CSV</td>
+                      <td>{EXPORT_UI.formatsLabel}</td>
                     </tr>
                 ))}
                 </tbody>
