@@ -1,7 +1,8 @@
 // Lightweight API client for interacting with Module 3 backend
-// In dev, requests use relative paths so Vite's proxy (vite.config.js) forwards them to the backend.
-// In production, VITE_API_URL must be set to the backend origin.
-const base = import.meta.env.DEV ? '' : import.meta.env.VITE_API_URL ?? ''
+// Prefer an explicit VITE_API_URL when present (even in dev) so the client can
+// call the backend over HTTPS and receive Secure cookies from the deployed
+// backend. Otherwise fall back to relative paths in dev (Vite proxy).
+const base = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : '')
 
 function buildUrl(path) {
   if (!path.startsWith('/')) path = '/' + path
