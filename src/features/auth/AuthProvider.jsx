@@ -45,10 +45,17 @@ export function AuthProvider({ children }) {
 
     async function bootstrap() {
       try {
-        await api.getAllDevices()
+        // Use a manual-fetch here to avoid following backend redirects
+        // (which can produce cross-origin requests and CORS errors in dev).
+        const res = await fetch('/api/devices', { credentials: 'include', redirect: 'manual' })
         if (active) {
-          setIsAuthenticated(true)
-          setCurrentUser(readCurrentUser())
+          if (res.status === 200) {
+            setIsAuthenticated(true)
+            setCurrentUser(readCurrentUser())
+          } else {
+            setIsAuthenticated(false)
+            setCurrentUser(null)
+          }
         }
       } catch {
         if (active) {

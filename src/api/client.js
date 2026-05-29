@@ -56,13 +56,18 @@ async function requestBlob(path, options = {}) {
 
 export async function login(username, password) {
   const body = new URLSearchParams({ username, password })
-  const res = await fetch(buildUrl('/api/auth/login'), {
+  const loginPath = base ? '/login' : '/api/login'
+  const res = await fetch(buildUrl(loginPath), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
     credentials: 'include',
+    redirect: 'manual',
   })
-  if (!res.ok) throw new Error('Login failed: ' + res.status)
+  // Spring Security login returns a redirect on success.
+  const isRedirectSuccess = res.status === 301 || res.status === 302 || res.status === 303
+  const isOpaqueRedirect = res.type === 'opaqueredirect' || res.status === 0
+  if (!res.ok && !isRedirectSuccess && !isOpaqueRedirect) throw new Error('Login failed: ' + res.status)
   return res
 }
 
@@ -102,7 +107,7 @@ export const api = {
   getAllDevices: () => request('/api/devices'),
   approveDevice: (id, userNames) => request(`/api/devices/${id}/approve`, { method: 'PUT', body: userNames }),
   denyDevice: (id) => request(`/api/devices/${id}/deny`, { method: 'PUT' }),
-  logout: () => request('/api/auth/logout', { method: 'POST' }),
+  logout: () => request(base ? '/logout' : '/api/logout', { method: 'POST' }),
 }
 
 export default request

@@ -25,6 +25,7 @@ export default function ExportPage() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [sessionCount, setSessionCount] = useState(null)
+  const [sessionCountError, setSessionCountError] = useState('')
 
   // Fetch total session count for the summary card
   useEffect(() => {
@@ -33,8 +34,16 @@ export default function ExportPage() {
         .then((data) => {
           const arr = Array.isArray(data) ? data : (data?.content ?? [])
           setSessionCount(arr.length)
+          setSessionCountError('')
         })
-        .catch(() => setSessionCount(null))
+        .catch((err) => {
+          setSessionCount(null)
+          if (err?.status === 401 || err?.status === 403) {
+            setSessionCountError('Sign in is required to fetch export summary totals.')
+          } else {
+            setSessionCountError('Unable to load export summary from backend.')
+          }
+        })
   }, [])
 
   const exportLabel = useMemo(() => exportTypes.find((entry) => entry.key === format)?.title ?? 'Export', [format])
@@ -84,6 +93,7 @@ export default function ExportPage() {
         <div style={{ marginTop: '1rem', display: 'grid', gap: '0.75rem' }}>
           <div>Privacy Compliance <strong style={{ float: 'right' }}>AES-256</strong></div>
           <div>Schema <strong style={{ float: 'right' }}>17-col GQ-RIS</strong></div>
+          {sessionCountError && <div style={{ color: '#9f1239', fontSize: '0.8rem', marginTop: '0.25rem' }}>{sessionCountError}</div>}
           {message && <div style={{ color: loading ? '#2149b7' : '#1a7a3a', fontSize: '0.8rem', marginTop: '0.25rem' }}>{message}</div>}
         </div>
       </div>
