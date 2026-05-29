@@ -45,12 +45,14 @@ export default function AnalyticsPage() {
   const [varieties, setVarieties] = useState([])
   const [selectedVariety, setSelectedVariety] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     let active = true
     Promise.all([api.getSessions(), api.getVarieties()])
         .then(([sessionPayload, varietyPayload]) => {
           if (!active) return
+          setError('')
           const raw = Array.isArray(sessionPayload) ? sessionPayload
               : Array.isArray(sessionPayload?.content) ? sessionPayload.content : []
           setSessions(raw)
@@ -58,7 +60,16 @@ export default function AnalyticsPage() {
               : Array.isArray(varietyPayload?.content) ? varietyPayload.content : []
           setVarieties(vars)
         })
-        .catch(() => { if (active) { setSessions([]); setVarieties([]) } })
+        .catch((err) => {
+          if (!active) return
+          setSessions([])
+          setVarieties([])
+          if (err?.status === 401 || err?.status === 403) {
+            setError('You are not authenticated. Please sign in to view analytics.')
+          } else {
+            setError('Failed to load analytics data from backend.')
+          }
+        })
         .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [])
@@ -107,6 +118,12 @@ export default function AnalyticsPage() {
           {loading && <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>Loading…</span>}
         </div>
 
+        {!!error && (
+            <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', borderRadius: 8, background: '#fff1f2', color: '#9f1239', border: '1px solid #fecdd3' }}>
+              {error}
+            </div>
+        )}
+
         {/* Summary cards */}
         <section className="hero-grid">
           {metrics.map((m) => (
@@ -126,7 +143,9 @@ export default function AnalyticsPage() {
                 <div className="section-subtitle">Completed sessions over time</div>
               </div>
             </div>
-            {trend.length === 0 ? (
+            {error ? (
+              <p style={{ padding: '1rem', color: 'var(--color-text-secondary)' }}>Analytics data is unavailable until backend access is restored.</p>
+            ) : trend.length === 0 ? (
                 <p style={{ padding: '1rem', color: 'var(--color-text-secondary)' }}>No session data yet.</p>
             ) : (
                 <div style={{ width: '100%', height: 280 }}>
@@ -154,7 +173,9 @@ export default function AnalyticsPage() {
                 <div className="section-subtitle">Mean amylose ordinal of verified sessions</div>
               </div>
             </div>
-            {consistency.length === 0 ? (
+            {error ? (
+              <p style={{ padding: '1rem', color: 'var(--color-text-secondary)' }}>Consistency data is unavailable until backend access is restored.</p>
+            ) : consistency.length === 0 ? (
                 <p style={{ padding: '1rem', color: 'var(--color-text-secondary)' }}>No verified session data yet.</p>
             ) : (
                 <div style={{ width: '100%', height: 280 }}>

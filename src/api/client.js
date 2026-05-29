@@ -55,15 +55,17 @@ async function requestBlob(path, options = {}) {
 }
 
 export async function login(username, password) {
-  const body = new URLSearchParams({ username, password })
-  const res = await fetch(buildUrl('/api/auth/login'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-    credentials: 'include',
-  })
-  if (!res.ok) throw new Error('Login failed: ' + res.status)
-  return res
+  return request('/api/auth/login', { method: 'POST', body: { username, password } })
+}
+
+export async function register(username, password) {
+  return request('/api/auth/register', { method: 'POST', body: { username, password } })
+}
+
+export async function importGqrisMirror(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request('/api/admin/gqris/import', { method: 'POST', body: formData })
 }
 
 export const api = {
@@ -103,6 +105,7 @@ export const api = {
   approveDevice: (id, userNames) => request(`/api/devices/${id}/approve`, { method: 'PUT', body: userNames }),
   denyDevice: (id) => request(`/api/devices/${id}/deny`, { method: 'PUT' }),
   logout: () => request('/api/auth/logout', { method: 'POST' }),
+  importGqrisMirror,
 }
 
 export default request

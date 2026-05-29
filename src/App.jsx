@@ -1,6 +1,7 @@
 import './App.css'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './features/auth/LoginPage'
+import RegisterPage from './features/auth/RegisterPage'
 import PasswordResetPage from './features/auth/PasswordResetPage'
 import { AuthProvider, useAuth } from './features/auth/AuthProvider'
 import DashboardShell from './features/layout/DashboardShell'
@@ -22,6 +23,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
           <Route path="/reset-password" element={<PasswordResetPage />} />
           <Route
             path="/app"

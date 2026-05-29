@@ -50,7 +50,10 @@ function LoginPage() {
           </div>
         </form>
 
-        
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.9rem', color: '#556' }}>New to the dashboard?</span>
+          <Link className="forgot" to="/register">Register</Link>
+        </div>
         <div className="footer-links">
           <span>Support</span>
           <span>Legal Policy</span>

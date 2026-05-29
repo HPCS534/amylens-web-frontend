@@ -45,10 +45,15 @@ export function AuthProvider({ children }) {
 
     async function bootstrap() {
       try {
-        await api.getAllDevices()
+        const res = await fetch('/api/auth/me', { credentials: 'include' })
         if (active) {
-          setIsAuthenticated(true)
-          setCurrentUser(readCurrentUser())
+          if (res.status === 200) {
+            setIsAuthenticated(true)
+            setCurrentUser(readCurrentUser())
+          } else {
+            setIsAuthenticated(false)
+            setCurrentUser(null)
+          }
         }
       } catch {
         if (active) {

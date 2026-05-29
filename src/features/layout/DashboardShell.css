@@ -481,9 +481,14 @@
   color: #24324a;
 }
 
-.primary-button {
+.reject-button {
   background: red;
   border-color: red;
+  min-height: 4.2rem;
+  border-radius: 2px;
+  justify-content: center;
+  text-align: center;
+  white-space: normal;
   color: white;
 }
 
