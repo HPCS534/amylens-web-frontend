@@ -8,13 +8,11 @@ import DeviceManagementPage from './features/device_workspace/DeviceManagementPa
 import FlaggedSessionsPage from './features/outlier_review/FlaggedSessionsPage'
 import AnalyticsPage from './features/analytics/AnalyticsPage'
 import ExportPage from './features/data_export/ExportPage'
-import { isPasswordResetRequired } from './features/auth/passwordResetState'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, initializing } = useAuth()
   if (initializing) return <div className="dashboard-loading">Loading session…</div>
   if (!isAuthenticated) return <Navigate to="/login" replace />
-  if (isPasswordResetRequired()) return <Navigate to="/reset-password" replace />
   return children
 }
 
@@ -75,7 +73,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
