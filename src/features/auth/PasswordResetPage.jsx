@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { api } from '../../api/client'
+import { api, login as apiLogin } from '../../api/client'
 import { clearPasswordResetRequired } from './passwordResetState'
 import './LoginPage.css'
 import './PasswordResetPage.css'
@@ -8,6 +8,7 @@ import './PasswordResetPage.css'
 export default function PasswordResetPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [username, setUsername] = useState(location.state?.username ?? '')
   const [currentPassword, setCurrentPassword] = useState(location.state?.currentPassword ?? '')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -18,6 +19,16 @@ export default function PasswordResetPage() {
     event.preventDefault()
     setError('')
 
+    if (!username.trim()) {
+      setError('Username is required.')
+      return
+    }
+
+    if (!currentPassword.trim()) {
+      setError('Current password is required.')
+      return
+    }
+
     if (newPassword !== confirmPassword) {
       setError('New password and confirmation do not match.')
       return
@@ -25,11 +36,16 @@ export default function PasswordResetPage() {
 
     setLoading(true)
     try {
+      await apiLogin(username.trim(), currentPassword)
       await api.resetPassword(currentPassword, newPassword)
       clearPasswordResetRequired()
       navigate('/app/devices', { replace: true })
     } catch (err) {
-      setError(err.body || err.message || 'Password reset failed.')
+      if (err?.status === 401 || err?.status === 403) {
+        setError('The backend rejected the sign-in or reset. Check the username and current password, then retry.')
+      } else {
+        setError(err.body || err.message || 'Password reset failed.')
+      }
     } finally {
       setLoading(false)
     }
@@ -54,6 +70,10 @@ export default function PasswordResetPage() {
         </header>
 
         <div className="reset-body">
+          <div className="field-group">
+            <label htmlFor="username">Username</label>
+            <input id="username" type="text" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} />
+          </div>
           <div className="field-group">
             <label htmlFor="currentPassword">Current Password</label>
             <input id="currentPassword" type="password" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
@@ -80,7 +100,7 @@ export default function PasswordResetPage() {
 
           <div className="reset-actions">
             <button className="btn-primary reset-submit" type="submit" disabled={loading}>
-              {loading ? 'Updating…' : 'Update Password & Continue →'}
+              {loading ? 'Signing in and updating…' : 'Sign In & Update Password →'}
             </button>
           </div>
         </div>

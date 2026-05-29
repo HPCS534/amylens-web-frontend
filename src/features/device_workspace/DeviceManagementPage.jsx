@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { api } from '../../api/client'
+import GqrisImportTrigger from './GqrisImportTrigger'
 
 function normalizeDevices(payload) {
   if (Array.isArray(payload)) return payload
@@ -159,6 +160,7 @@ function DeviceManagementPage() {
               <div className="section-subtitle">Authorization queue for new hardware nodes.</div>
             </div>
             <div className="pill-row">
+              <GqrisImportTrigger />
               <button className="ghost-button" type="button" onClick={fetchDevices}>Refresh</button>
             </div>
           </div>
@@ -197,10 +199,10 @@ function DeviceManagementPage() {
                             <button className="ghost-button sr-only" aria-label={`Manage ${registration.ssaid ?? registration.id}`} type="button" onClick={() => setSelectedRegistration(registration)}>
                               Manage
                             </button>
-                            <button className="outline-button" type="button" onClick={() => updateDevice(registration, 'approve')} aria-label={`Approve ${registration.ssaid ?? registration.id}`}>
+                            <button className="primary-button" type="button" onClick={() => updateDevice(registration, 'approve')} aria-label={`Approve ${registration.ssaid ?? registration.id}`}>
                               ✓
                             </button>
-                            <button className="primary-button" type="button" onClick={() => updateDevice(registration, 'deny')} aria-label={`Deny ${registration.ssaid ?? registration.id}`}>
+                            <button className="outline-button" type="button" onClick={() => updateDevice(registration, 'deny')} aria-label={`Deny ${registration.ssaid ?? registration.id}`}>
                               ✕
                             </button>
                           </div>

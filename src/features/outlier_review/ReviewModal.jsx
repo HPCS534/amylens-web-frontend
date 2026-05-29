@@ -74,7 +74,7 @@ function ReviewModal({ analysisSession, reasonComment, onReasonCommentChange, on
         </div>
 
         <div className="review-modal-actions">
-          <button className="outline-button review-approve-button" type="button" onClick={() => onApprove(analysisSession.sessionId)}>
+          <button className="primary-button review-approve-button" type="button" onClick={() => onApprove(analysisSession.sessionId)}>
             <span className="review-button-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" role="presentation" focusable="false">
                 <path d="M12 2a10 10 0 1 0 10 10A10.01 10.01 0 0 0 12 2zm4.7 7.9-5.3 5.3-2.8-2.8 1.4-1.4 1.4 1.4 3.9-3.9z" fill="currentColor" />
@@ -85,7 +85,7 @@ function ReviewModal({ analysisSession, reasonComment, onReasonCommentChange, on
           <button className="ghost-button review-cancel-button" type="button" onClick={onClose}>
             Cancel
           </button>
-          <button className="primary-button review-reject-button" type="button" onClick={() => onReject(analysisSession.sessionId, reasonComment)}>
+          <button className="reject-button review-reject-button" type="button" onClick={() => onReject(analysisSession.sessionId, reasonComment)}>
             <span className="review-button-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" role="presentation" focusable="false">
                 <path d="M6 3h12l3 4v14H3V3h3zm2 4h8V5H8v2zm1 4 3 3 3-3 1.4 1.4-3 3 3 3L15 19l-3-3-3 3-1.4-1.4 3-3-3-3L9 11z" fill="currentColor" />

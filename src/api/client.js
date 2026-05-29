@@ -55,20 +55,17 @@ async function requestBlob(path, options = {}) {
 }
 
 export async function login(username, password) {
-  const body = new URLSearchParams({ username, password })
-  const loginPath = base ? '/login' : '/api/login'
-  const res = await fetch(buildUrl(loginPath), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-    credentials: 'include',
-    redirect: 'manual',
-  })
-  // Spring Security login returns a redirect on success.
-  const isRedirectSuccess = res.status === 301 || res.status === 302 || res.status === 303
-  const isOpaqueRedirect = res.type === 'opaqueredirect' || res.status === 0
-  if (!res.ok && !isRedirectSuccess && !isOpaqueRedirect) throw new Error('Login failed: ' + res.status)
-  return res
+  return request('/api/auth/login', { method: 'POST', body: { username, password } })
+}
+
+export async function register(username, password) {
+  return request('/api/auth/register', { method: 'POST', body: { username, password } })
+}
+
+export async function importGqrisMirror(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request('/api/admin/gqris/import', { method: 'POST', body: formData })
 }
 
 export const api = {
@@ -107,7 +104,8 @@ export const api = {
   getAllDevices: () => request('/api/devices'),
   approveDevice: (id, userNames) => request(`/api/devices/${id}/approve`, { method: 'PUT', body: userNames }),
   denyDevice: (id) => request(`/api/devices/${id}/deny`, { method: 'PUT' }),
-  logout: () => request(base ? '/logout' : '/api/logout', { method: 'POST' }),
+  logout: () => request('/api/auth/logout', { method: 'POST' }),
+  importGqrisMirror,
 }
 
 export default request
