@@ -56,7 +56,7 @@ async function requestBlob(path, options = {}) {
 
 export async function login(username, password) {
   const body = new URLSearchParams({ username, password })
-  const res = await fetch(buildUrl('/login'), {
+  const res = await fetch(buildUrl('/api/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
