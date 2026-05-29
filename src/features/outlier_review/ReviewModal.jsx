@@ -2,8 +2,10 @@ function formatMetricConfidence(metricConfidence) {
   return `${(metricConfidence * 100).toFixed(1)}%`
 }
 
+import { UI_LABELS } from '../../config/entities'
+
 function formatReviewTimestamp(timestamp) {
-  if (!timestamp) return 'Pending'
+  if (!timestamp) return UI_LABELS.pendingAssignment === undefined ? 'Pending' : UI_LABELS.pendingAssignment
   const date = new Date(timestamp)
   if (Number.isNaN(date.getTime())) return String(timestamp)
   return date.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC')
@@ -47,7 +49,7 @@ function ReviewModal({ analysisSession, reasonComment, onReasonCommentChange, on
           <div className="review-detail-card" style={{ marginTop: '1rem' }}>
             <div>
               <div className="review-label">REVIEWER</div>
-              <div className="review-value">{reviewerIdentity ?? analysisSession.reviewerIdentity ?? 'Pending assignment'}</div>
+              <div className="review-value">{reviewerIdentity ?? analysisSession.reviewerIdentity ?? UI_LABELS.pendingAssignment}</div>
             </div>
             <div>
               <div className="review-label">REVIEW TIMESTAMP</div>
@@ -57,12 +59,12 @@ function ReviewModal({ analysisSession, reasonComment, onReasonCommentChange, on
 
           <div className="field-group review-note-group">
             <label htmlFor="reason-comment">Review Notes <span className="review-required">*</span></label>
-            <textarea
+              <textarea
               id="reason-comment"
               value={reasonComment}
               onChange={(event) => onReasonCommentChange(event.target.value)}
               rows={6}
-              placeholder="Provide justification..."
+              placeholder={UI_LABELS.provideJustificationPlaceholder}
             />
           </div>
 
@@ -115,7 +117,7 @@ function ReviewSuccessModal({ action, reviewerIdentity, reviewTimestamp, reviewe
             : 'The session flag has been resolved and the data has been invalidated for security purposes.'}
         </div>
         <div style={{ marginTop: '0.75rem', display: 'grid', gap: '0.35rem', fontSize: '0.9rem', color: '#374151' }}>
-          <div><strong>Reviewer:</strong> {reviewerIdentity ?? 'Unknown'}</div>
+          <div><strong>Reviewer:</strong> {reviewerIdentity ?? UI_LABELS.unknownReviewer}</div>
           <div><strong>Timestamp:</strong> {formatReviewTimestamp(reviewTimestamp)}</div>
           {reviewerNote ? <div><strong>Note:</strong> {reviewerNote}</div> : null}
         </div>
